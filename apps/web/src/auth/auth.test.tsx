@@ -1,11 +1,17 @@
 import { plantPageSchema } from '@sitecheck/shared';
 import { screen, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { apiFetch } from '../lib/api';
+import { dataHandlers } from '../test/data';
 import { adminUser, authHandlers, inspectorUser } from '../test/fixtures';
 import { currentUrl, renderApp } from '../test/render';
 import { apiUrl, server } from '../test/server';
+
+// Protected pages load their own data; these tests are about auth and routing.
+beforeEach(() => {
+  server.use(...dataHandlers().handlers);
+});
 
 async function fillLogin(user: ReturnType<typeof renderApp>['user']) {
   await user.type(await screen.findByLabelText('Email'), 'admin@sitecheck.dev');

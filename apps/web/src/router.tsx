@@ -3,6 +3,7 @@ import { RequireAuth } from './auth/RequireAuth';
 import { AppLayout } from './components/AppLayout';
 import { LoginPage } from './pages/LoginPage';
 import { NotFoundPage } from './pages/NotFoundPage';
+import { PlantsPage } from './pages/PlantsPage';
 import { PlaceholderPage } from './pages/PlaceholderPage';
 
 /**
@@ -20,7 +21,7 @@ export const routes: RouteObject[] = [
         element: <AppLayout />,
         children: [
           { index: true, element: <Navigate to="/plants" replace /> },
-          { path: 'plants', element: <PlaceholderPage title="Plants" /> },
+          { path: 'plants', element: <PlantsPage /> },
           { path: 'sites', element: <PlaceholderPage title="Sites" /> },
         ],
       },

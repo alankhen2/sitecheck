@@ -1,8 +1,14 @@
 import { screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { dataHandlers } from './test/data';
 import { adminUser, authHandlers } from './test/fixtures';
 import { currentUrl, renderApp } from './test/render';
 import { server } from './test/server';
+
+// Protected pages load their own data; these tests are about auth and routing.
+beforeEach(() => {
+  server.use(...dataHandlers().handlers);
+});
 
 describe('routes', () => {
   it('sends / to the plants page', async () => {

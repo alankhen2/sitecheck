@@ -1,5 +1,5 @@
 import { defineConfig, mergeConfig } from 'vitest/config';
-import viteConfig from './vite.config';
+import viteConfig from './vite.config.ts';
 
 /** Component tests: the Vite setup (React plugin) plus a simulated browser (jsdom). */
 export default mergeConfig(
