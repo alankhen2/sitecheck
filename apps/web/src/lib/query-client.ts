@@ -1,4 +1,5 @@
-import { QueryClient } from '@tanstack/react-query';
+import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query';
+import { currentUserKey } from '../auth/keys';
 import { ApiError, UnexpectedResponseError } from './api';
 
 /**
@@ -15,7 +16,18 @@ export function shouldRetry(failureCount: number, error: unknown): boolean {
 
 /** A function, not a module-level client, so each test gets a fresh cache. */
 export function createQueryClient() {
-  return new QueryClient({
+  // Any request answered 401 means the session is gone (expired after 8 h, or
+  // the user was deleted). Marking the user as logged out in one place makes
+  // RequireAuth send them to the login page from whatever page they are on.
+  const onError = (error: unknown) => {
+    if (error instanceof ApiError && error.isUnauthorized) {
+      client.setQueryData(currentUserKey, null);
+    }
+  };
+
+  const client: QueryClient = new QueryClient({
+    queryCache: new QueryCache({ onError }),
+    mutationCache: new MutationCache({ onError }),
     defaultOptions: {
       queries: {
         // Data younger than 30 s is shown without refetching (e.g. when going
@@ -27,4 +39,5 @@ export function createQueryClient() {
       mutations: { retry: false },
     },
   });
+  return client;
 }

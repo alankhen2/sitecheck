@@ -1,5 +1,7 @@
 import { createBrowserRouter, Navigate, type RouteObject } from 'react-router';
+import { RequireAuth } from './auth/RequireAuth';
 import { AppLayout } from './components/AppLayout';
+import { LoginPage } from './pages/LoginPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { PlaceholderPage } from './pages/PlaceholderPage';
 
@@ -8,14 +10,20 @@ import { PlaceholderPage } from './pages/PlaceholderPage';
  * memory router at any URL.
  */
 export const routes: RouteObject[] = [
-  { path: '/login', element: <PlaceholderPage title="Log in" /> },
+  { path: '/login', element: <LoginPage /> },
   {
-    path: '/',
-    element: <AppLayout />,
+    // A layout route without a path: everything below needs a login.
+    element: <RequireAuth />,
     children: [
-      { index: true, element: <Navigate to="/plants" replace /> },
-      { path: 'plants', element: <PlaceholderPage title="Plants" /> },
-      { path: 'sites', element: <PlaceholderPage title="Sites" /> },
+      {
+        path: '/',
+        element: <AppLayout />,
+        children: [
+          { index: true, element: <Navigate to="/plants" replace /> },
+          { path: 'plants', element: <PlaceholderPage title="Plants" /> },
+          { path: 'sites', element: <PlaceholderPage title="Sites" /> },
+        ],
+      },
     ],
   },
   { path: '*', element: <NotFoundPage /> },

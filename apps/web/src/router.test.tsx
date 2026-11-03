@@ -1,30 +1,21 @@
-import { QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
-import { createMemoryRouter, RouterProvider } from 'react-router';
+import { screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { createQueryClient } from './lib/query-client';
-import { routes } from './router';
-
-function renderAt(path: string) {
-  const router = createMemoryRouter(routes, { initialEntries: [path] });
-  render(
-    <QueryClientProvider client={createQueryClient()}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>,
-  );
-  return router;
-}
+import { adminUser, authHandlers } from './test/fixtures';
+import { currentUrl, renderApp } from './test/render';
+import { server } from './test/server';
 
 describe('routes', () => {
   it('sends / to the plants page', async () => {
-    const router = renderAt('/');
+    server.use(authHandlers.loggedInAs(adminUser));
+    const { router } = renderApp('/');
 
     expect(await screen.findByRole('heading', { name: 'Plants' })).toBeInTheDocument();
-    expect(router.state.location.pathname).toBe('/plants');
+    expect(currentUrl(router)).toBe('/plants');
   });
 
   it('marks the current page in the navigation', async () => {
-    renderAt('/sites');
+    server.use(authHandlers.loggedInAs(adminUser));
+    renderApp('/sites');
 
     expect(await screen.findByRole('link', { name: 'Sites' })).toHaveAttribute(
       'aria-current',
@@ -32,8 +23,8 @@ describe('routes', () => {
     );
   });
 
-  it('shows a not-found page for an unknown address', async () => {
-    renderAt('/no-such-page');
+  it('shows a not-found page for an unknown address, without needing a login', async () => {
+    renderApp('/no-such-page');
 
     expect(await screen.findByRole('heading', { name: 'Page not found' })).toBeInTheDocument();
   });
