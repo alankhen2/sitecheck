@@ -25,3 +25,32 @@ export function dueState(iso: string | null, now: Date = new Date()): DueState {
   if (due <= now.getTime() + 7 * DAY_MS) return 'soon';
   return 'later';
 }
+
+/*
+ * <input type="datetime-local"> works in "wall clock" text without a time
+ * zone: "2026-11-05T09:30" means 9:30 where the user is. The API stores an
+ * exact moment as ISO 8601 with an offset. These two convert between them in
+ * the browser's time zone, so an inspector in Perth and an admin in Sydney
+ * each see the moment in their own local time.
+ */
+
+const pad = (n: number) => String(n).padStart(2, '0');
+
+/** An ISO moment as the value of a datetime-local input, in local time; '' for none. */
+export function toDateTimeLocal(iso: string | null): string {
+  if (iso === null) return '';
+  const d = new Date(iso);
+  return `${String(d.getFullYear())}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/**
+ * A datetime-local value as an ISO moment in UTC; null for an empty input.
+ * `new Date("YYYY-MM-DDTHH:mm")` (no offset) is read as local time by the
+ * JavaScript spec, which is exactly what the input means.
+ */
+export function fromDateTimeLocal(value: string): string | null {
+  if (value === '') return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) throw new RangeError(`Not a datetime-local value: ${value}`);
+  return date.toISOString();
+}

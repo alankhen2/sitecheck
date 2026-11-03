@@ -9,6 +9,9 @@ export default mergeConfig(
       environment: 'jsdom',
       include: ['src/**/*.test.{ts,tsx}'],
       setupFiles: ['src/test/setup.ts'],
+      // One fixed time zone (with daylight saving) for every machine and CI,
+      // so tests of local-time conversion mean the same thing everywhere.
+      env: { TZ: 'Australia/Sydney' },
     },
   }),
 );
