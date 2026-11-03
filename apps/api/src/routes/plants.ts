@@ -3,6 +3,7 @@ import {
   errorResponseSchema,
   idParamsSchema,
   listPlantsQuerySchema,
+  plantPageSchema,
   plantSchema,
   updatePlantBodySchema,
 } from '@sitecheck/shared';
@@ -31,7 +32,7 @@ export const plantRoutes: FastifyPluginAsyncZod<{ plants: PlantService }> = (app
     '/plants',
     {
       onRequest: loggedIn,
-      schema: { querystring: listPlantsQuerySchema, response: { 200: z.array(plantSchema) } },
+      schema: { querystring: listPlantsQuerySchema, response: { 200: plantPageSchema } },
     },
     (request) => plants.list(request.query),
   );

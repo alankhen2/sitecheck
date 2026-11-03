@@ -2,6 +2,8 @@ import type {
   CreatePlantBody,
   ListPlantsQuery,
   Plant,
+  PlantPage,
+  PlantSort,
   PlantStatus,
   UpdatePlantBody,
 } from '@sitecheck/shared';
@@ -29,9 +31,21 @@ export type NewPlant = Pick<
 >;
 export type PlantChanges = Partial<NewPlant>;
 
+export interface PlantSearch {
+  /** Case-insensitive substring of name, type or serial number. */
+  q?: string;
+  /** Any of these statuses. */
+  status?: PlantStatus[];
+  siteId?: string;
+  /** Always ends with `id` as a tie-breaker, so pages never overlap or skip rows. */
+  sort: PlantSort;
+  skip: number;
+  take: number;
+}
+
 export interface PlantRepository {
-  /** Sorted by name. */
-  list(filter: { siteId?: string }): Promise<PlantRecord[]>;
+  /** One page of matches plus the total count, read from the same snapshot. */
+  search(criteria: PlantSearch): Promise<{ rows: PlantRecord[]; total: number }>;
   findById(id: string): Promise<PlantRecord | null>;
   findBySerialNumber(serialNumber: string): Promise<PlantRecord | null>;
   countInspections(id: string): Promise<number>;
@@ -103,8 +117,21 @@ export function createPlantService({ plants, sites }: PlantServiceDeps) {
   }
 
   return {
-    async list(query: ListPlantsQuery): Promise<Plant[]> {
-      return (await plants.list(definedOnly(query))).map(toPlant);
+    async list(query: ListPlantsQuery): Promise<PlantPage> {
+      const { page, pageSize, sort, ...filters } = query;
+      const { rows, total } = await plants.search({
+        ...definedOnly(filters),
+        sort,
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      });
+      return {
+        items: rows.map(toPlant),
+        page,
+        pageSize,
+        total,
+        totalPages: Math.ceil(total / pageSize),
+      };
     },
 
     async get(id: string): Promise<Plant> {

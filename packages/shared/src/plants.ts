@@ -1,5 +1,11 @@
 import { z } from 'zod';
-import { atLeastOneField, atLeastOneFieldMessage, isoDateTimeSchema } from './common.js';
+import {
+  atLeastOneField,
+  atLeastOneFieldMessage,
+  isoDateTimeSchema,
+  paginatedSchema,
+  paginationQuerySchema,
+} from './common.js';
 
 /** Mirrors the Prisma `PlantStatus` enum; the api typechecks that the two stay in sync. */
 export const plantStatusSchema = z.enum(['ACTIVE', 'REPAIR', 'INACTIVE']);
@@ -42,7 +48,28 @@ export const updatePlantBodySchema = z
   .refine(atLeastOneField, atLeastOneFieldMessage);
 export type UpdatePlantBody = z.infer<typeof updatePlantBodySchema>;
 
+/** `name` A-Z, or `nextInspectionAt` soonest first (plants with no date last). */
+export const plantSortSchema = z.enum(['name', 'nextInspectionAt']);
+export type PlantSort = z.infer<typeof plantSortSchema>;
+
 export const listPlantsQuerySchema = z.object({
+  // Matches name, type or serial number, ignoring case. A blank search is no filter.
+  q: z
+    .string()
+    .trim()
+    .max(100)
+    .transform((s) => (s === '' ? undefined : s))
+    .optional(),
+  // `?status=ACTIVE` arrives as a string, `?status=ACTIVE&status=REPAIR` as an array.
+  status: z
+    .union([plantStatusSchema, z.array(plantStatusSchema)])
+    .transform((s) => [...new Set(Array.isArray(s) ? s : [s])])
+    .optional(),
   siteId: z.uuid().optional(),
+  sort: plantSortSchema.default('name'),
+  ...paginationQuerySchema.shape,
 });
 export type ListPlantsQuery = z.infer<typeof listPlantsQuerySchema>;
+
+export const plantPageSchema = paginatedSchema(plantSchema);
+export type PlantPage = z.infer<typeof plantPageSchema>;

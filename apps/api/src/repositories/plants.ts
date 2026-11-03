@@ -4,6 +4,7 @@ import type {
   PrismaClient,
   PlantStatus as DbPlantStatus,
 } from '../generated/prisma/client.js';
+import { escapeLike } from '../lib/like.js';
 import { isPrismaError, PrismaCode } from '../lib/prisma-errors.js';
 import type { Assert, Same } from '../lib/types.js';
 import { InvalidReferenceError, NotFoundError } from '../services/errors.js';
@@ -47,9 +48,38 @@ function mapWriteError(err: unknown): never {
 
 export function createPlantRepository(prisma: PrismaClient): PlantRepository {
   return {
-    async list(filter) {
-      const rows = await prisma.plant.findMany({ where: filter, select, orderBy: { name: 'asc' } });
-      return rows.map(toRecord);
+    async search({ q, status, siteId, sort, skip, take }) {
+      const where: Prisma.PlantWhereInput = {};
+      if (siteId !== undefined) where.siteId = siteId;
+      if (status !== undefined) where.status = { in: status };
+      if (q !== undefined) {
+        // ILIKE '%q%' with q as a bound parameter. Wildcards in q are escaped so a
+        // search for "100%" or "E_A" matches those characters literally.
+        const contains = escapeLike(q);
+        where.OR = [
+          { name: { contains, mode: 'insensitive' } },
+          { type: { contains, mode: 'insensitive' } },
+          { serialNumber: { contains, mode: 'insensitive' } },
+        ];
+      }
+
+      // `id` last as a tie-breaker: without a total order, rows with equal keys
+      // can swap between queries and appear on two pages or on none.
+      const orderBy: Prisma.PlantOrderByWithRelationInput[] =
+        sort === 'name'
+          ? [{ name: 'asc' }, { id: 'asc' }]
+          : [{ nextInspectionAt: { sort: 'asc', nulls: 'last' } }, { name: 'asc' }, { id: 'asc' }];
+
+      // REPEATABLE READ: both statements see one snapshot. Under Postgres' default
+      // READ COMMITTED, a plant added between them could make total and rows disagree.
+      const [rows, total] = await prisma.$transaction(
+        [
+          prisma.plant.findMany({ where, select, orderBy, skip, take }),
+          prisma.plant.count({ where }),
+        ],
+        { isolationLevel: 'RepeatableRead' },
+      );
+      return { rows: rows.map(toRecord), total };
     },
 
     async findById(id) {

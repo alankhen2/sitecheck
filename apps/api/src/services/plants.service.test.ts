@@ -1,5 +1,6 @@
+import type { ListPlantsQuery, PlantStatus } from '@sitecheck/shared';
 import { describe, expect, it } from 'vitest';
-import { fakePlants, fakeSites, testPlants, testSites } from '../test-utils/fakes.js';
+import { fakePlants, fakeSites, plantAt, testPlants, testSites } from '../test-utils/fakes.js';
 import { ConflictError, InvalidReferenceError, NotFoundError } from './errors.js';
 import { createPlantService } from './plants.service.js';
 
@@ -23,14 +24,23 @@ const newPlant = {
   nextInspectionAt: '2026-11-20T00:00:00.000Z',
 };
 
-describe('list and get', () => {
-  it('lists plants with the site name and ISO dates', async () => {
+/** Full list query with the schema defaults, so tests only spell what they vary. */
+const query = (overrides: Partial<ListPlantsQuery> = {}): ListPlantsQuery => ({
+  sort: 'name',
+  page: 1,
+  pageSize: 20,
+  ...overrides,
+});
+
+describe('list: shape and filters', () => {
+  it('returns a page with the site name and ISO dates', async () => {
     const { service } = setup();
 
-    const plants = await service.list({});
+    const page = await service.list(query());
 
-    expect(plants.map((p) => p.name)).toEqual(['CAT 336 Excavator', 'CAT 980 Wheel Loader']);
-    expect(plants[0]).toMatchObject({
+    expect(page).toMatchObject({ page: 1, pageSize: 20, total: 2, totalPages: 1 });
+    expect(page.items.map((p) => p.name)).toEqual(['CAT 336 Excavator', 'CAT 980 Wheel Loader']);
+    expect(page.items[0]).toMatchObject({
       siteName: 'Westgate Quarry',
       nextInspectionAt: '2026-11-05T00:00:00.000Z',
     });
@@ -39,10 +49,120 @@ describe('list and get', () => {
   it('filters by site', async () => {
     const { service } = setup();
 
-    expect(await service.list({ siteId: testSites.emptyYard.id })).toEqual([]);
-    expect(await service.list({ siteId: testSites.quarry.id })).toHaveLength(2);
+    expect((await service.list(query({ siteId: testSites.emptyYard.id }))).total).toBe(0);
+    expect((await service.list(query({ siteId: testSites.quarry.id }))).total).toBe(2);
   });
 
+  it('searches name, type and serial number, ignoring case', async () => {
+    const { service } = setup();
+    const names = async (q: string) => (await service.list(query({ q }))).items.map((p) => p.name);
+
+    expect(await names('wheel')).toEqual(['CAT 980 Wheel Loader']); // name
+    expect(await names('EXCAVATOR')).toEqual(['CAT 336 Excavator']); // type
+    expect(await names('wgq-wl')).toEqual(['CAT 980 Wheel Loader']); // serial number
+    expect(await names('cat')).toHaveLength(2);
+  });
+
+  it('filters by one or more statuses', async () => {
+    const sites = fakeSites([{ ...testSites.quarry, plantCount: 3 }]);
+    const plants = fakePlants(sites, [
+      testPlants.excavator,
+      { ...testPlants.loader, status: 'REPAIR' },
+      plantAt(3, { status: 'INACTIVE' }),
+    ]);
+    const service = createPlantService({ plants, sites });
+    const statuses = async (status: PlantStatus[]) =>
+      (await service.list(query({ status }))).items.map((p) => p.status).sort();
+
+    expect(await statuses(['REPAIR'])).toEqual(['REPAIR']);
+    expect(await statuses(['ACTIVE', 'REPAIR'])).toEqual(['ACTIVE', 'REPAIR']);
+  });
+
+  it('combines filters with AND', async () => {
+    const { service } = setup();
+
+    const page = await service.list(query({ q: 'cat', status: ['ACTIVE'], siteId: missingId }));
+
+    expect(page.total).toBe(0);
+  });
+});
+
+describe('list: pagination', () => {
+  /** 25 plants named "Plant 01" ... "Plant 25". */
+  function setupMany() {
+    const rows = Array.from({ length: 25 }, (_, i) => plantAt(i + 1));
+    const sites = fakeSites([{ ...testSites.quarry, plantCount: rows.length }]);
+    return createPlantService({ plants: fakePlants(sites, rows), sites });
+  }
+
+  it('splits results into pages and reports the totals', async () => {
+    const service = setupMany();
+
+    const first = await service.list(query({ pageSize: 10 }));
+    const last = await service.list(query({ pageSize: 10, page: 3 }));
+
+    expect(first).toMatchObject({ total: 25, totalPages: 3 });
+    expect(first.items.map((p) => p.name)).toEqual(
+      Array.from({ length: 10 }, (_, i) => `Plant ${String(i + 1).padStart(2, '0')}`),
+    );
+    expect(last.items.map((p) => p.name)).toEqual([
+      'Plant 21',
+      'Plant 22',
+      'Plant 23',
+      'Plant 24',
+      'Plant 25',
+    ]);
+  });
+
+  it('returns an empty page past the end, not an error', async () => {
+    const service = setupMany();
+
+    const page = await service.list(query({ pageSize: 10, page: 4 }));
+
+    expect(page).toMatchObject({ items: [], page: 4, total: 25, totalPages: 3 });
+  });
+
+  it('reports zero pages when nothing matches', async () => {
+    const service = setupMany();
+
+    const page = await service.list(query({ q: 'no such plant' }));
+
+    expect(page).toMatchObject({ items: [], total: 0, totalPages: 0 });
+  });
+
+  it('never repeats or skips a plant across pages when names tie', async () => {
+    const rows = Array.from({ length: 6 }, (_, i) => plantAt(i + 1, { name: 'Same Name' }));
+    const sites = fakeSites([{ ...testSites.quarry, plantCount: rows.length }]);
+    const service = createPlantService({ plants: fakePlants(sites, rows.reverse()), sites });
+
+    const pages = await Promise.all(
+      [1, 2, 3].map((page) => service.list(query({ pageSize: 2, page }))),
+    );
+    const ids = pages.flatMap((p) => p.items.map((item) => item.id));
+
+    expect(ids).toEqual([...ids].sort()); // ordered by id as the tie-breaker
+    expect(new Set(ids).size).toBe(6);
+  });
+});
+
+describe('list: sorting by next inspection', () => {
+  it('puts the soonest first and plants without a date last', async () => {
+    const sites = fakeSites([{ ...testSites.quarry, plantCount: 4 }]);
+    const plants = fakePlants(sites, [
+      plantAt(1, { name: 'No date', nextInspectionAt: null }),
+      plantAt(2, { name: 'Later', nextInspectionAt: new Date('2026-12-01T00:00:00Z') }),
+      plantAt(3, { name: 'Overdue', nextInspectionAt: new Date('2026-10-20T00:00:00Z') }),
+      plantAt(4, { name: 'Soon', nextInspectionAt: new Date('2026-11-06T00:00:00Z') }),
+    ]);
+    const service = createPlantService({ plants, sites });
+
+    const page = await service.list(query({ sort: 'nextInspectionAt' }));
+
+    expect(page.items.map((p) => p.name)).toEqual(['Overdue', 'Soon', 'Later', 'No date']);
+  });
+});
+
+describe('get', () => {
   it('throws NotFoundError for an unknown id', async () => {
     const { service } = setup();
 

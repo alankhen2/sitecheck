@@ -149,13 +149,25 @@ export function fakePlants(
 
   return {
     rows,
-    list: ({ siteId }) =>
-      Promise.resolve(
-        rows
-          .filter((p) => siteId === undefined || p.siteId === siteId)
-          .sort((a, b) => a.name.localeCompare(b.name))
-          .map(copy),
-      ),
+    search: ({ q, status, siteId, sort, skip, take }) => {
+      const needle = q?.toLowerCase();
+      const matches = rows.filter(
+        (p) =>
+          (siteId === undefined || p.siteId === siteId) &&
+          (status === undefined || status.includes(p.status)) &&
+          (needle === undefined ||
+            [p.name, p.type, p.serialNumber].some((v) => v.toLowerCase().includes(needle))),
+      );
+      // Same order as the database: the chosen key, then name, then id as a tie-breaker.
+      const byId = (a: PlantRecord, b: PlantRecord) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+      const byName = (a: PlantRecord, b: PlantRecord) => a.name.localeCompare(b.name) || byId(a, b);
+      const time = (p: PlantRecord) => p.nextInspectionAt?.getTime() ?? Number.POSITIVE_INFINITY;
+      matches.sort(sort === 'name' ? byName : (a, b) => time(a) - time(b) || byName(a, b));
+      return Promise.resolve({
+        rows: matches.slice(skip, skip + take).map(copy),
+        total: matches.length,
+      });
+    },
     findById: (id) => {
       const plant = find(id);
       return Promise.resolve(plant ? copy(plant) : null);
@@ -230,3 +242,18 @@ export const testPlants = {
     updatedAt: day('2026-10-01'),
   },
 } satisfies Record<string, PlantRecord>;
+
+/**
+ * A plant at testSites.quarry named "Plant NN", with an id that sorts by n.
+ * Remember to set the site's plantCount when seeding several.
+ */
+export function plantAt(n: number, overrides: Partial<PlantRecord> = {}): PlantRecord {
+  const nn = String(n).padStart(2, '0');
+  return {
+    ...testPlants.loader,
+    id: `019a0000-0000-7000-8000-0000000007${nn}`,
+    name: `Plant ${nn}`,
+    serialNumber: `TEST-${nn}`,
+    ...overrides,
+  };
+}

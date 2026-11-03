@@ -30,16 +30,42 @@ describe('GET /plants', () => {
     expect(res.statusCode).toBe(401);
   });
 
-  it('lists plants with their site name', async () => {
+  it('returns the first page with defaults', async () => {
     const { app, cookies } = await asUser('inspector');
 
     const res = await app.inject({ method: 'GET', url: '/plants', cookies });
 
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual([
-      expect.objectContaining({ name: 'CAT 336 Excavator', siteName: 'Westgate Quarry' }),
-      expect.objectContaining({ name: 'CAT 980 Wheel Loader', nextInspectionAt: null }),
-    ]);
+    expect(res.json()).toEqual({
+      items: [
+        expect.objectContaining({ name: 'CAT 336 Excavator', siteName: 'Westgate Quarry' }),
+        expect.objectContaining({ name: 'CAT 980 Wheel Loader', nextInspectionAt: null }),
+      ],
+      page: 1,
+      pageSize: 20,
+      total: 2,
+      totalPages: 1,
+    });
+  });
+
+  it('reads search, repeated status, sort and paging from the query string', async () => {
+    const { app, cookies } = await asUser('inspector');
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/plants?q=%20CAT%20&status=ACTIVE&status=REPAIR&sort=nextInspectionAt&page=2&pageSize=1',
+      cookies,
+    });
+
+    expect(res.statusCode).toBe(200);
+    // Excavator (due 2026-11-05) sorts before the loader (no date), so page 2 is the loader.
+    expect(res.json()).toMatchObject({
+      items: [{ name: 'CAT 980 Wheel Loader' }],
+      page: 2,
+      pageSize: 1,
+      total: 2,
+      totalPages: 2,
+    });
   });
 
   it('filters by siteId', async () => {
@@ -52,13 +78,21 @@ describe('GET /plants', () => {
     });
 
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual([]);
+    expect(res.json()).toMatchObject({ items: [], total: 0, totalPages: 0 });
   });
 
-  it('returns 400 for a siteId that is not a UUID', async () => {
+  it.each([
+    ['a siteId that is not a UUID', 'siteId=abc'],
+    ['an unknown status', 'status=BROKEN'],
+    ['a sort field outside the allowlist', 'sort=passwordHash'],
+    ['page 0', 'page=0'],
+    ['a page that is not a number', 'page=two'],
+    ['pageSize above 100', 'pageSize=101'],
+    ['a search longer than 100 characters', `q=${'x'.repeat(101)}`],
+  ])('returns 400 for %s', async (_label, queryString) => {
     const { app, cookies } = await asUser('inspector');
 
-    const res = await app.inject({ method: 'GET', url: '/plants?siteId=abc', cookies });
+    const res = await app.inject({ method: 'GET', url: `/plants?${queryString}`, cookies });
 
     expect(res.statusCode).toBe(400);
   });
