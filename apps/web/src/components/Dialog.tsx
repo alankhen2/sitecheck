@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, type ReactNode } from 'react';
+import { useId, useLayoutEffect, useRef, type ReactNode } from 'react';
 
 interface Props {
   title: string;
@@ -21,7 +21,10 @@ export function Dialog({ title, onClose, children }: Props) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
 
-  useEffect(() => {
+  // A layout effect, not useEffect: its cleanup runs while the <dialog> is
+  // still in the page. useEffect's cleanup runs after React has removed it,
+  // and closing a detached dialog cannot send focus back to the opener.
+  useLayoutEffect(() => {
     const dialog = ref.current;
     if (dialog && !dialog.open) {
       dialog.showModal();
