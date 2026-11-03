@@ -18,7 +18,8 @@ pnpm monorepo:
   - `src/repositories/`: Prisma implementations of those interfaces; they map Prisma error codes (`src/lib/prisma-errors.ts`) to domain errors for check-then-write races.
   - `src/plugins/auth.ts`: JWT session cookie, `app.authenticate` (401) and `app.requireRole(...)` (401/403), used as `onRequest` hooks so auth runs before body validation; `request.user` is loaded from the db each request.
   - `src/routes/`: thin HTTP handlers with Zod `schema` (body/query/params/response) via `fastify-type-provider-zod`.
-  - `src/test-utils/`: in-memory fakes for tests (excluded from the build).
+  - `src/test-utils/`: in-memory fakes for unit tests (excluded from the build).
+  - `src/test-integration/`: integration test setup. It refuses any database whose name does not end in `_test`, because it truncates every table.
   - `prisma/schema.prisma`, `prisma/migrations/`; client generated to `src/generated/` (gitignored).
 - `packages/shared`: Zod schemas and inferred types shared by web and api. Built to `dist/`.
 
@@ -28,7 +29,8 @@ Run from the repo root. On Windows PowerShell with a restricted execution policy
 
 - `docker compose up -d db`: start Postgres 18 (localhost only).
 - `pnpm dev`: build shared, then run web (5173) and api (3000) in watch mode.
-- `pnpm lint` / `pnpm typecheck` / `pnpm test` / `pnpm build`: same checks CI runs.
+- `pnpm lint` / `pnpm typecheck` / `pnpm test` / `pnpm build`: same checks CI runs. `pnpm test` is unit tests only (no database).
+- `pnpm test:integration`: the real app (Supertest + Prisma) against `sitecheck_test`, created and migrated automatically. Needs the db container. Files are `*.int.test.ts` in `apps/api/src`.
 - `pnpm format`: Prettier write. `pnpm format:check` is what CI uses.
 - `pnpm --filter @sitecheck/api db:migrate`: create and apply a migration (local only).
 - `pnpm --filter @sitecheck/api db:seed`: idempotent demo data (2 users, 3 sites, 15 plants).
@@ -46,7 +48,7 @@ First run: copy `apps/api/.env.example` to `apps/api/.env`, start the db, then `
 - Never commit `.env` or secrets; document new variables in `.env.example`.
 - Adding a dependency with install scripts needs an explicit `allowBuilds` entry in `pnpm-workspace.yaml`; explain why.
 - Pin GitHub Actions to a full commit SHA with the version in a comment.
-- Before committing: `pnpm format && pnpm lint && pnpm typecheck && pnpm test`.
+- Before committing: `pnpm format && pnpm lint && pnpm typecheck && pnpm test`, plus `pnpm test:integration` when `apps/api` changed.
 - Conventional Commits, one logical change per commit (e.g. `feat(api): add plant pagination`).
 - Propose a plan before editing more than 3 files.
 

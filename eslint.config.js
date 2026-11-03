@@ -23,7 +23,11 @@ export default tseslint.config(
       parserOptions: {
         // Config files outside any tsconfig "include" get a default project.
         projectService: {
-          allowDefaultProject: ['apps/api/prisma.config.ts', 'apps/api/vitest.config.ts'],
+          allowDefaultProject: [
+            'apps/api/prisma.config.ts',
+            'apps/api/vitest.config.ts',
+            'apps/api/vitest.integration.config.ts',
+          ],
         },
         tsconfigRootDir: import.meta.dirname,
       },

@@ -7,6 +7,7 @@
     "dev": "pnpm --filter @sitecheck/shared build && pnpm -r --parallel dev",
     "build": "pnpm -r build",
     "test": "pnpm -r --if-present test",
+    "test:integration": "pnpm --filter @sitecheck/shared build && pnpm --filter @sitecheck/api test:integration",
     "lint": "pnpm --filter @sitecheck/shared build && eslint .",
     "lint:fix": "pnpm --filter @sitecheck/shared build && eslint . --fix",
     "format": "prettier . --write",
