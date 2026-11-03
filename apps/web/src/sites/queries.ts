@@ -2,14 +2,10 @@ import { siteSchema, type CreateSiteBody, type Site, type UpdateSiteBody } from 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
 import { apiFetch, apiFetchEmpty } from '../lib/api';
-import { plantKeys } from '../plants/queries';
+import { plantKeys } from '../plants/keys';
+import { siteKeys } from './keys';
 
 const siteListSchema = z.array(siteSchema);
-
-export const siteKeys = {
-  all: ['sites'] as const,
-  list: () => ['sites', 'list'] as const,
-};
 
 /** Every site, sorted by name (the API's order). */
 export function useSites() {

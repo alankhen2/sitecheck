@@ -1,4 +1,5 @@
 import type { Plant } from '@sitecheck/shared';
+import type { ReactNode } from 'react';
 import { NextInspection } from './NextInspection';
 import { StatusBadge } from './StatusBadge';
 
@@ -6,10 +7,12 @@ interface Props {
   plants: Plant[];
   /** Showing the previous results while new ones load. */
   stale: boolean;
+  /** Extra cells for each row (Edit / Delete). */
+  actions?: (plant: Plant) => ReactNode;
 }
 
 /** The plant list as a table. On narrow screens it scrolls sideways (cards come in 3.5). */
-export function PlantTable({ plants, stale }: Props) {
+export function PlantTable({ plants, stale, actions }: Props) {
   return (
     <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
       <table
@@ -34,6 +37,11 @@ export function PlantTable({ plants, stale }: Props) {
             <th scope="col" className="px-4 py-3 font-medium">
               Next inspection
             </th>
+            {actions && (
+              <th scope="col" className="px-4 py-3 font-medium">
+                <span className="sr-only">Actions</span>
+              </th>
+            )}
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
@@ -51,6 +59,9 @@ export function PlantTable({ plants, stale }: Props) {
               <td className="px-4 py-3">
                 <NextInspection iso={plant.nextInspectionAt} />
               </td>
+              {actions && (
+                <td className="px-4 py-3 text-right whitespace-nowrap">{actions(plant)}</td>
+              )}
             </tr>
           ))}
         </tbody>

@@ -1,4 +1,12 @@
-import type { CreateSiteBody, Plant, Site, UpdateSiteBody } from '@sitecheck/shared';
+import type {
+  CreatePlantBody,
+  CreateSiteBody,
+  ErrorCode,
+  Plant,
+  Site,
+  UpdatePlantBody,
+  UpdateSiteBody,
+} from '@sitecheck/shared';
 import { http, HttpResponse } from 'msw';
 import { apiUrl } from './server';
 
@@ -94,7 +102,29 @@ export function dataHandlers(
   const writes: WriteRequest[] = [];
   let created = 0;
 
-  const notFound = () => HttpResponse.json({ message: 'Site not found' }, { status: 404 });
+  const notFound = (entity: string) =>
+    HttpResponse.json({ message: `${entity} not found` }, { status: 404 });
+  const conflict = (message: string, code: ErrorCode) =>
+    HttpResponse.json({ message, code }, { status: 409 });
+  const countPlants = () => {
+    for (const site of sites) site.plantCount = plants.filter((p) => p.siteId === site.id).length;
+  };
+
+  /** The API's plant rules: site exists and is active, serial number unique. */
+  function checkPlant(body: UpdatePlantBody, current?: Plant) {
+    if (body.siteId !== undefined && body.siteId !== current?.siteId) {
+      const site = sites.find((s) => s.id === body.siteId);
+      if (!site) return HttpResponse.json({ message: 'Site does not exist' }, { status: 400 });
+      if (!site.isActive) {
+        return conflict('Cannot place a plant at an inactive site', 'SITE_INACTIVE');
+      }
+    }
+    const serial = body.serialNumber;
+    if (serial !== undefined && plants.some((p) => p.serialNumber === serial && p !== current)) {
+      return conflict('Serial number is already used by another plant', 'SERIAL_NUMBER_TAKEN');
+    }
+    return null;
+  }
 
   const plantsHandler = http.get(apiUrl('/plants'), ({ request }) => {
     const url = new URL(request.url);
@@ -153,7 +183,7 @@ export function dataHandlers(
     const body = (await request.json()) as UpdateSiteBody;
     writes.push({ method: 'PATCH', path: `/sites/${String(params.id)}`, body });
     const site = sites.find((s) => s.id === params.id);
-    if (!site) return notFound();
+    if (!site) return notFound('Site');
     Object.assign(site, body);
     plants = plants.map((p) => (p.siteId === site.id ? { ...p, siteName: site.name } : p));
     return HttpResponse.json(site);
@@ -162,7 +192,7 @@ export function dataHandlers(
   const deleteSite = http.delete(apiUrl('/sites/:id'), ({ params }) => {
     writes.push({ method: 'DELETE', path: `/sites/${String(params.id)}`, body: null });
     const site = sites.find((s) => s.id === params.id);
-    if (!site) return notFound();
+    if (!site) return notFound('Site');
     if (plants.some((p) => p.siteId === site.id)) {
       return HttpResponse.json(
         { message: 'Site still has plants; move or delete them first', code: 'SITE_HAS_PLANTS' },
@@ -173,10 +203,49 @@ export function dataHandlers(
     return new HttpResponse(null, { status: 204 });
   });
 
+  const createPlant = http.post(apiUrl('/plants'), async ({ request }) => {
+    const body = (await request.json()) as CreatePlantBody;
+    writes.push({ method: 'POST', path: '/plants', body });
+    const refused = checkPlant(body);
+    if (refused) return refused;
+    created += 1;
+    const plant: Plant = {
+      id: `019a0000-0000-7000-8000-2000000000${String(created).padStart(2, '0')}`,
+      ...body,
+      siteName: sites.find((s) => s.id === body.siteId)?.name ?? '',
+      createdAt: '2026-11-01T00:00:00.000Z',
+      updatedAt: '2026-11-01T00:00:00.000Z',
+    };
+    plants = [...plants, plant];
+    countPlants();
+    return HttpResponse.json(plant, { status: 201 });
+  });
+
+  const updatePlant = http.patch(apiUrl('/plants/:id'), async ({ request, params }) => {
+    const body = (await request.json()) as UpdatePlantBody;
+    writes.push({ method: 'PATCH', path: `/plants/${String(params.id)}`, body });
+    const plant = plants.find((p) => p.id === params.id);
+    if (!plant) return notFound('Plant');
+    const refused = checkPlant(body, plant);
+    if (refused) return refused;
+    Object.assign(plant, body);
+    plant.siteName = sites.find((s) => s.id === plant.siteId)?.name ?? '';
+    countPlants();
+    return HttpResponse.json(plant);
+  });
+
   return {
     plants: plantsHandler,
     sites: sitesHandler,
-    handlers: [plantsHandler, sitesHandler, createSite, updateSite, deleteSite],
+    handlers: [
+      plantsHandler,
+      sitesHandler,
+      createSite,
+      updateSite,
+      deleteSite,
+      createPlant,
+      updatePlant,
+    ],
     requests,
     writes,
   };
