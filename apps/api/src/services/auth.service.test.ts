@@ -1,42 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  createAuthService,
-  EmailTakenError,
-  InvalidCredentialsError,
-  type NewUser,
-  type UserRecord,
-  type UserRepository,
-} from './auth.service.js';
+import { createAuthService, EmailTakenError, InvalidCredentialsError } from './auth.service.js';
+import { fakeHashPassword, fakeUsers, fakeVerifyPassword, testUsers } from '../test-utils/fakes.js';
 
-/** In-memory repository, so the rules are tested without a database. */
-function fakeUsers(initial: UserRecord[] = []): UserRepository & { rows: UserRecord[] } {
-  const rows = [...initial];
-  return {
-    rows,
-    findByEmail: (email) => Promise.resolve(rows.find((u) => u.email === email) ?? null),
-    findById: (id) => Promise.resolve(rows.find((u) => u.id === id) ?? null),
-    create: (data: NewUser) => {
-      if (rows.some((u) => u.email === data.email)) return Promise.reject(new EmailTakenError());
-      const user = { ...data, id: `019a0000-0000-7000-8000-00000000000${String(rows.length + 1)}` };
-      rows.push(user);
-      return Promise.resolve(user);
-    },
-  };
-}
-
-// Fast stand-ins for scrypt: the real hashing has its own tests in lib/password.test.ts.
-const hashPassword = vi.fn((password: string) => Promise.resolve(`hashed:${password}`));
-const verifyPassword = vi.fn((password: string, stored: string) =>
-  Promise.resolve(stored === `hashed:${password}`),
-);
-
-const ivy: UserRecord = {
-  id: '019a0000-0000-7000-8000-0000000000aa',
-  name: 'Ivy Inspector',
-  email: 'ivy@sitecheck.dev',
-  role: 'INSPECTOR',
-  passwordHash: 'hashed:correct horse battery',
-};
+// Wrapped in vi.fn so tests can assert how often the password check ran.
+const hashPassword = vi.fn(fakeHashPassword);
+const verifyPassword = vi.fn(fakeVerifyPassword);
+const ivy = testUsers.inspector;
 
 beforeEach(() => {
   vi.clearAllMocks();
