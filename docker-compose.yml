@@ -1,0 +1,22 @@
+services:
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-sitecheck}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sitecheck}
+      POSTGRES_DB: ${POSTGRES_DB:-sitecheck}
+    ports:
+      # Bind to localhost only, so the database is not reachable from the network.
+      - '127.0.0.1:5432:5432'
+    volumes:
+      # Postgres 18+ images keep data under /var/lib/postgresql/<major>/.
+      - db-data:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  db-data:

@@ -7,7 +7,7 @@ import prettier from 'eslint-config-prettier';
 import globals from 'globals';
 
 export default tseslint.config(
-  { ignores: ['**/dist/**', '**/node_modules/**', '**/coverage/**'] },
+  { ignores: ['**/dist/**', '**/node_modules/**', '**/coverage/**', '**/generated/**'] },
 
   // Base rules for every TypeScript file in the monorepo.
   // "TypeChecked" presets read tsconfig, so rules can use type information
@@ -21,7 +21,8 @@ export default tseslint.config(
     ],
     languageOptions: {
       parserOptions: {
-        projectService: true,
+        // Config files outside any tsconfig "include" get a default project.
+        projectService: { allowDefaultProject: ['apps/api/prisma.config.ts'] },
         tsconfigRootDir: import.meta.dirname,
       },
     },

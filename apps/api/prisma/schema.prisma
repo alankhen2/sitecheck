@@ -1,0 +1,128 @@
+// SiteCheck data model.
+// Site 1──* Plant 1──* Inspection 1──* InspectionItem; AuditLog records changes.
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  INSPECTOR
+}
+
+enum PlantStatus {
+  ACTIVE
+  REPAIR
+  INACTIVE
+}
+
+enum InspectionResult {
+  PASS
+  FAIL
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+}
+
+model User {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         Role     @default(INSPECTOR)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  inspections Inspection[]
+  auditLogs   AuditLog[]
+
+  @@map("users")
+}
+
+model Site {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  name      String
+  address   String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  plants Plant[]
+
+  @@map("sites")
+}
+
+model Plant {
+  id               String      @id @default(uuid(7)) @db.Uuid
+  siteId           String      @db.Uuid
+  name             String
+  type             String
+  serialNumber     String      @unique
+  status           PlantStatus @default(ACTIVE)
+  nextInspectionAt DateTime?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  // Restrict: a site that still has plants cannot be deleted by accident.
+  site        Site         @relation(fields: [siteId], references: [id], onDelete: Restrict)
+  inspections Inspection[]
+
+  @@index([siteId])
+  @@index([status])
+  @@index([nextInspectionAt])
+  @@map("plants")
+}
+
+model Inspection {
+  id          String           @id @default(uuid(7)) @db.Uuid
+  plantId     String           @db.Uuid
+  inspectorId String           @db.Uuid
+  result      InspectionResult
+  notes       String?
+  inspectedAt DateTime         @default(now())
+
+  plant     Plant            @relation(fields: [plantId], references: [id], onDelete: Cascade)
+  inspector User             @relation(fields: [inspectorId], references: [id], onDelete: Restrict)
+  items     InspectionItem[]
+
+  @@index([plantId, inspectedAt])
+  @@index([inspectorId])
+  @@map("inspections")
+}
+
+model InspectionItem {
+  id           String  @id @default(uuid(7)) @db.Uuid
+  inspectionId String  @db.Uuid
+  label        String
+  passed       Boolean
+  comment      String?
+
+  inspection Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+
+  @@index([inspectionId])
+  @@map("inspection_items")
+}
+
+model AuditLog {
+  id        String      @id @default(uuid(7)) @db.Uuid
+  userId    String      @db.Uuid
+  entity    String // "Plant" | "Inspection"
+  entityId  String      @db.Uuid
+  action    AuditAction
+  changes   Json
+  createdAt DateTime    @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([entity, entityId, createdAt])
+  @@map("audit_logs")
+}
