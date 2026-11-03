@@ -1,4 +1,4 @@
-import type { Plant, Site } from '@sitecheck/shared';
+import type { CreateSiteBody, Plant, Site, UpdateSiteBody } from '@sitecheck/shared';
 import { http, HttpResponse } from 'msw';
 import { apiUrl } from './server';
 
@@ -69,13 +69,32 @@ export const testPlants: Plant[] = [
   }),
 ];
 
+/** A write request the fake API received, for tests that check what was sent. */
+export interface WriteRequest {
+  method: string;
+  path: string;
+  body: unknown;
+}
+
 /**
- * MSW handlers for GET /plants and GET /sites over in-memory data. /plants
- * filters, sorts and pages like the API does, so page tests exercise real
- * behaviour. Every /plants request URL is recorded in `requests`.
+ * MSW handlers over in-memory data that behave like the API: /plants filters,
+ * sorts and pages; site writes change the data (a renamed site is renamed on
+ * its plants too) and deleting a site that still has plants is a 409. Each
+ * call starts from fresh copies, so one test's changes never leak into the
+ * next. Every /plants request URL is recorded in `requests`, every write in
+ * `writes`.
  */
-export function dataHandlers(plants: Plant[] = testPlants, sites: Site[] = testSites) {
+export function dataHandlers(
+  initialPlants: Plant[] = testPlants,
+  initialSites: Site[] = testSites,
+) {
+  let plants = initialPlants.map((plant) => ({ ...plant }));
+  let sites = initialSites.map((site) => ({ ...site }));
   const requests: URL[] = [];
+  const writes: WriteRequest[] = [];
+  let created = 0;
+
+  const notFound = () => HttpResponse.json({ message: 'Site not found' }, { status: 404 });
 
   const plantsHandler = http.get(apiUrl('/plants'), ({ request }) => {
     const url = new URL(request.url);
@@ -111,12 +130,54 @@ export function dataHandlers(plants: Plant[] = testPlants, sites: Site[] = testS
     });
   });
 
-  const sitesHandler = http.get(apiUrl('/sites'), () => HttpResponse.json(sites));
+  const sitesHandler = http.get(apiUrl('/sites'), () =>
+    HttpResponse.json([...sites].sort((a, b) => a.name.localeCompare(b.name))),
+  );
+
+  const createSite = http.post(apiUrl('/sites'), async ({ request }) => {
+    const body = (await request.json()) as CreateSiteBody;
+    writes.push({ method: 'POST', path: '/sites', body });
+    created += 1;
+    const site: Site = {
+      id: `019a0000-0000-7000-8000-1000000000${String(created).padStart(2, '0')}`,
+      ...body,
+      plantCount: 0,
+      createdAt: '2026-11-01T00:00:00.000Z',
+      updatedAt: '2026-11-01T00:00:00.000Z',
+    };
+    sites = [...sites, site];
+    return HttpResponse.json(site, { status: 201 });
+  });
+
+  const updateSite = http.patch(apiUrl('/sites/:id'), async ({ request, params }) => {
+    const body = (await request.json()) as UpdateSiteBody;
+    writes.push({ method: 'PATCH', path: `/sites/${String(params.id)}`, body });
+    const site = sites.find((s) => s.id === params.id);
+    if (!site) return notFound();
+    Object.assign(site, body);
+    plants = plants.map((p) => (p.siteId === site.id ? { ...p, siteName: site.name } : p));
+    return HttpResponse.json(site);
+  });
+
+  const deleteSite = http.delete(apiUrl('/sites/:id'), ({ params }) => {
+    writes.push({ method: 'DELETE', path: `/sites/${String(params.id)}`, body: null });
+    const site = sites.find((s) => s.id === params.id);
+    if (!site) return notFound();
+    if (plants.some((p) => p.siteId === site.id)) {
+      return HttpResponse.json(
+        { message: 'Site still has plants; move or delete them first' },
+        { status: 409 },
+      );
+    }
+    sites = sites.filter((s) => s !== site);
+    return new HttpResponse(null, { status: 204 });
+  });
 
   return {
     plants: plantsHandler,
     sites: sitesHandler,
-    handlers: [plantsHandler, sitesHandler],
+    handlers: [plantsHandler, sitesHandler, createSite, updateSite, deleteSite],
     requests,
+    writes,
   };
 }
