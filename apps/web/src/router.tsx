@@ -4,7 +4,7 @@ import { AppLayout } from './components/AppLayout';
 import { LoginPage } from './pages/LoginPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { PlantsPage } from './pages/PlantsPage';
-import { PlaceholderPage } from './pages/PlaceholderPage';
+import { SitesPage } from './pages/SitesPage';
 
 /**
  * Exported separately from the router so tests can mount the same routes in a
@@ -22,7 +22,7 @@ export const routes: RouteObject[] = [
         children: [
           { index: true, element: <Navigate to="/plants" replace /> },
           { path: 'plants', element: <PlantsPage /> },
-          { path: 'sites', element: <PlaceholderPage title="Sites" /> },
+          { path: 'sites', element: <SitesPage /> },
         ],
       },
     ],
