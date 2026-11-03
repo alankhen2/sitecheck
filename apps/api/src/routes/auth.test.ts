@@ -1,27 +1,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { buildApp } from '../app.js';
 import { loadConfig } from '../config.js';
 import { SESSION_COOKIE } from '../plugins/auth.js';
-import { createAuthService, type UserRecord } from '../services/auth.service.js';
-import { fakeHashPassword, fakeUsers, fakeVerifyPassword, testUsers } from '../test-utils/fakes.js';
+import type { UserRecord } from '../services/auth.service.js';
+import { buildTestApp, loginWith, testConfig, withSession } from '../test-utils/app.js';
+import { testUsers } from '../test-utils/fakes.js';
 
-const config = loadConfig({
-  NODE_ENV: 'test',
-  JWT_SECRET: 'test-secret-that-is-at-least-32-chars',
-});
+/** The full app plus test-only routes that exercise the guards directly. */
+async function setup(users: UserRecord[] = [testUsers.admin, testUsers.inspector]) {
+  const built = await buildTestApp({ users });
+  const { app } = built;
 
-/** A full app (routes, plugins, schemas) on top of an in-memory user store. */
-async function setup(initial: UserRecord[] = [testUsers.admin, testUsers.inspector]) {
-  const users = fakeUsers(initial);
-  const auth = createAuthService({
-    users,
-    hashPassword: fakeHashPassword,
-    verifyPassword: fakeVerifyPassword,
-  });
-  const app = await buildApp({ config, auth });
-
-  // Test-only routes to exercise the guards the real routes will use.
   app.get('/test/any-user', { onRequest: app.authenticate }, (req) => ({ id: req.user.id }));
   app.get('/test/admin-only', { onRequest: app.requireRole('ADMIN') }, () => ({ ok: true }));
   app.post(
@@ -33,23 +22,8 @@ async function setup(initial: UserRecord[] = [testUsers.admin, testUsers.inspect
     () => ({ ok: true }),
   );
 
-  return { app, users };
+  return built;
 }
-
-type App = Awaited<ReturnType<typeof setup>>['app'];
-
-async function loginAs(app: App, email: string, password: string): Promise<string> {
-  const res = await app.inject({
-    method: 'POST',
-    url: '/auth/login',
-    payload: { email, password },
-  });
-  const cookie = res.cookies.find((c) => c.name === SESSION_COOKIE);
-  if (!cookie) throw new Error(`login failed: ${String(res.statusCode)} ${res.body}`);
-  return cookie.value;
-}
-
-const withSession = (token: string) => ({ [SESSION_COOKIE]: token });
 
 afterEach(() => {
   vi.useRealTimers();
@@ -167,7 +141,7 @@ describe('POST /auth/logout', () => {
 describe('authenticate (GET /auth/me)', () => {
   it('returns the current user for a valid session', async () => {
     const { app } = await setup();
-    const token = await loginAs(app, testUsers.inspector.email, 'correct horse battery');
+    const token = await loginWith(app, testUsers.inspector.email, 'correct horse battery');
 
     const res = await app.inject({ method: 'GET', url: '/auth/me', cookies: withSession(token) });
 
@@ -185,15 +159,10 @@ describe('authenticate (GET /auth/me)', () => {
 
   it('returns 401 for a token signed with another secret', async () => {
     const { app } = await setup();
-    const other = await buildApp({
-      config: { ...config, JWT_SECRET: 'a-different-secret-also-32-chars-long' },
-      auth: createAuthService({
-        users: fakeUsers([testUsers.inspector]),
-        hashPassword: fakeHashPassword,
-        verifyPassword: fakeVerifyPassword,
-      }),
+    const { app: other } = await buildTestApp({
+      config: { ...testConfig, JWT_SECRET: 'a-different-secret-also-32-chars-long' },
     });
-    const forged = await loginAs(other, testUsers.inspector.email, 'correct horse battery');
+    const forged = await loginWith(other, testUsers.inspector.email, 'correct horse battery');
 
     const res = await app.inject({ method: 'GET', url: '/auth/me', cookies: withSession(forged) });
 
@@ -216,7 +185,7 @@ describe('authenticate (GET /auth/me)', () => {
 
   it('returns 401 once the token has expired', async () => {
     const { app } = await setup();
-    const token = await loginAs(app, testUsers.inspector.email, 'correct horse battery');
+    const token = await loginWith(app, testUsers.inspector.email, 'correct horse battery');
 
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(Date.now() + 8 * 60 * 60 * 1000 + 1000);
@@ -227,7 +196,7 @@ describe('authenticate (GET /auth/me)', () => {
 
   it('returns 401 when the user was deleted after logging in', async () => {
     const { app, users } = await setup();
-    const token = await loginAs(app, testUsers.inspector.email, 'correct horse battery');
+    const token = await loginWith(app, testUsers.inspector.email, 'correct horse battery');
     users.rows.splice(
       users.rows.findIndex((u) => u.id === testUsers.inspector.id),
       1,
@@ -242,7 +211,7 @@ describe('authenticate (GET /auth/me)', () => {
 describe('requireRole', () => {
   it('checks the session before validating the body', async () => {
     const { app } = await setup();
-    const token = await loginAs(app, testUsers.inspector.email, 'correct horse battery');
+    const token = await loginWith(app, testUsers.inspector.email, 'correct horse battery');
     const badBody = { name: '' };
 
     const anonymous = await app.inject({
@@ -272,7 +241,7 @@ describe('requireRole', () => {
 
   it('returns 403 for a logged-in user with the wrong role', async () => {
     const { app } = await setup();
-    const token = await loginAs(app, testUsers.inspector.email, 'correct horse battery');
+    const token = await loginWith(app, testUsers.inspector.email, 'correct horse battery');
 
     const res = await app.inject({
       method: 'GET',
@@ -285,7 +254,7 @@ describe('requireRole', () => {
 
   it('lets an admin through', async () => {
     const { app } = await setup();
-    const token = await loginAs(app, testUsers.admin.email, 'admin password 123');
+    const token = await loginWith(app, testUsers.admin.email, 'admin password 123');
 
     const res = await app.inject({
       method: 'GET',
@@ -298,7 +267,7 @@ describe('requireRole', () => {
 
   it('uses the role from the database, not the one at login', async () => {
     const { app, users } = await setup();
-    const token = await loginAs(app, testUsers.inspector.email, 'correct horse battery');
+    const token = await loginWith(app, testUsers.inspector.email, 'correct horse battery');
     const ivy = users.rows.find((u) => u.id === testUsers.inspector.id);
     if (ivy) ivy.role = 'ADMIN'; // promoted after logging in
 
