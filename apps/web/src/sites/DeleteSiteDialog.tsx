@@ -1,7 +1,7 @@
 import type { Site } from '@sitecheck/shared';
 import { Link } from 'react-router';
 import { Dialog } from '../components/Dialog';
-import { ApiError } from '../lib/api';
+import { hasErrorCode } from '../lib/api';
 import { userMessage } from '../lib/errors';
 import { useDeleteSite } from './queries';
 
@@ -20,8 +20,7 @@ const buttonClass = 'rounded px-4 py-2 text-slate-700 hover:bg-slate-100';
  */
 export function DeleteSiteDialog({ site, onClose }: Props) {
   const remove = useDeleteSite();
-  const hasPlants =
-    site.plantCount > 0 || (remove.error instanceof ApiError && remove.error.status === 409);
+  const hasPlants = site.plantCount > 0 || hasErrorCode(remove.error, 'SITE_HAS_PLANTS');
 
   if (hasPlants) {
     return (

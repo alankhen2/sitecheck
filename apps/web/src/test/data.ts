@@ -165,7 +165,7 @@ export function dataHandlers(
     if (!site) return notFound();
     if (plants.some((p) => p.siteId === site.id)) {
       return HttpResponse.json(
-        { message: 'Site still has plants; move or delete them first' },
+        { message: 'Site still has plants; move or delete them first', code: 'SITE_HAS_PLANTS' },
         { status: 409 },
       );
     }

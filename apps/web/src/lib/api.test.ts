@@ -2,7 +2,7 @@ import { healthResponseSchema } from '@sitecheck/shared';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
 import { apiUrl, server } from '../test/server';
-import { ApiError, apiFetch, apiFetchEmpty, UnexpectedResponseError } from './api';
+import { ApiError, apiFetch, apiFetchEmpty, hasErrorCode, UnexpectedResponseError } from './api';
 
 const health = { status: 'ok', uptime: 12.5, timestamp: '2026-11-03T08:00:00.000Z' };
 
@@ -49,6 +49,41 @@ describe('apiFetch', () => {
 
     expect(error).toBeInstanceOf(ApiError);
     expect(error).toMatchObject({ status: 404, message: 'Site not found' });
+  });
+
+  it('carries the error code, so callers need not match message text', async () => {
+    server.use(
+      http.post(apiUrl('/plants'), () =>
+        HttpResponse.json(
+          {
+            message: 'Serial number is already used by another plant',
+            code: 'SERIAL_NUMBER_TAKEN',
+          },
+          { status: 409 },
+        ),
+      ),
+    );
+
+    const error = await apiFetch('/plants', healthResponseSchema, { method: 'POST' }).catch(
+      (e: unknown) => e,
+    );
+
+    expect(error).toMatchObject({ status: 409, code: 'SERIAL_NUMBER_TAKEN' });
+    expect(hasErrorCode(error, 'SERIAL_NUMBER_TAKEN')).toBe(true);
+    expect(hasErrorCode(error, 'SITE_INACTIVE')).toBe(false);
+    expect(hasErrorCode(new Error('x'), 'SERIAL_NUMBER_TAKEN')).toBe(false);
+  });
+
+  it('keeps the message when the code is one this app does not know yet', async () => {
+    server.use(
+      http.post(apiUrl('/plants'), () =>
+        HttpResponse.json({ message: 'Plant is locked', code: 'PLANT_LOCKED' }, { status: 409 }),
+      ),
+    );
+
+    await expect(
+      apiFetch('/plants', healthResponseSchema, { method: 'POST' }),
+    ).rejects.toMatchObject({ status: 409, message: 'Plant is locked', code: undefined });
   });
 
   it('uses a generic message when the error body is not the API shape', async () => {

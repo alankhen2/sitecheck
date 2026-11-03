@@ -1,4 +1,9 @@
-import { errorResponseSchema } from '@sitecheck/shared';
+import {
+  errorCodeSchema,
+  errorResponseSchema,
+  type ErrorCode,
+  type ErrorResponse,
+} from '@sitecheck/shared';
 
 /**
  * The one place the web app talks to the API.
@@ -24,6 +29,8 @@ export class ApiError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    /** The API's machine-readable reason, e.g. SERIAL_NUMBER_TAKEN; match on this, not on the message. */
+    readonly code?: ErrorCode,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -72,19 +79,33 @@ async function send(path: string, { method = 'GET', body, signal }: RequestOptio
     throw new ApiError(0, 'Cannot reach the server. Check your connection and try again.');
   }
 
-  if (!res.ok) throw new ApiError(res.status, await errorMessage(res));
+  if (!res.ok) {
+    const { message, code } = await errorBody(res);
+    throw new ApiError(res.status, message, code);
+  }
   return res;
 }
 
-/** The API's `{ message }`, or a generic text if the body is something else (e.g. a proxy page). */
-async function errorMessage(res: Response): Promise<string> {
+// Lenient about `code`: an API deployed ahead of this app may send a code it
+// does not know yet. The message is still worth showing; the code is dropped.
+const lenientErrorSchema = errorResponseSchema.extend({
+  code: errorCodeSchema.optional().catch(undefined),
+});
+
+/** The API's `{ message, code? }`, or a generic text if the body is something else (e.g. a proxy page). */
+async function errorBody(res: Response): Promise<ErrorResponse> {
   try {
-    const parsed = errorResponseSchema.safeParse(await res.json());
-    if (parsed.success) return parsed.data.message;
+    const parsed = lenientErrorSchema.safeParse(await res.json());
+    if (parsed.success) return parsed.data;
   } catch {
     // Not JSON.
   }
-  return `Request failed (${String(res.status)})`;
+  return { message: `Request failed (${String(res.status)})` };
+}
+
+/** True if `error` is the API refusing for this particular reason. */
+export function hasErrorCode(error: unknown, code: ErrorCode): boolean {
+  return error instanceof ApiError && error.code === code;
 }
 
 /** A request whose response body is parsed with `schema`. */
