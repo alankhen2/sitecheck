@@ -75,3 +75,41 @@ export async function agentFor(app: IntegrationApp['app'], who: keyof typeof use
   await agent.post('/auth/login').send({ email, password }).expect(200);
   return agent;
 }
+
+let serial = 0;
+
+/** Inserts a site directly (not through the API), for arranging test data. */
+export function createSite(overrides: { name?: string; isActive?: boolean } = {}) {
+  return prisma.site.create({
+    data: { name: 'Westgate Quarry', address: '120 Quarry Rd', isActive: true, ...overrides },
+  });
+}
+
+/** Inserts a plant directly. Serial numbers are unique per call unless given. */
+export function createPlant(
+  siteId: string,
+  overrides: {
+    id?: string;
+    name?: string;
+    type?: string;
+    serialNumber?: string;
+    status?: 'ACTIVE' | 'REPAIR' | 'INACTIVE';
+    nextInspectionAt?: Date | null;
+  } = {},
+) {
+  serial += 1;
+  return prisma.plant.create({
+    data: {
+      siteId,
+      name: 'CAT 336 Excavator',
+      type: 'Excavator',
+      serialNumber: `INT-${String(serial).padStart(4, '0')}`,
+      ...overrides,
+    },
+  });
+}
+
+/** Records an inspection directly; the inspection API arrives in phase 4. */
+export function createInspection(plantId: string, inspectorId: string) {
+  return prisma.inspection.create({ data: { plantId, inspectorId, result: 'PASS' } });
+}
