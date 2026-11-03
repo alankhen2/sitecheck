@@ -7,7 +7,7 @@ import {
   type UpdatePlantBody,
 } from '@sitecheck/shared';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { apiFetch } from '../lib/api';
+import { apiFetch, apiFetchEmpty } from '../lib/api';
 import { siteKeys } from '../sites/keys';
 import { plantKeys } from './keys';
 import { plantQueryToParams } from './search-params';
@@ -55,6 +55,14 @@ export function useUpdatePlant() {
   return useMutation({
     mutationFn: ({ id, changes }: { id: Plant['id']; changes: UpdatePlantBody }) =>
       apiFetch(`/plants/${id}`, plantSchema, { method: 'PATCH', body: changes }),
+    onSettled: refresh,
+  });
+}
+
+export function useDeletePlant() {
+  const refresh = useRefreshAfterPlantChange();
+  return useMutation({
+    mutationFn: (id: Plant['id']) => apiFetchEmpty(`/plants/${id}`, { method: 'DELETE' }),
     onSettled: refresh,
   });
 }

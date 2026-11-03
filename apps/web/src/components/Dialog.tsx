@@ -26,17 +26,21 @@ export function Dialog({ title, onClose, children }: Props) {
   // and closing a detached dialog cannot send focus back to the opener.
   useLayoutEffect(() => {
     const dialog = ref.current;
-    if (dialog && !dialog.open) {
-      dialog.showModal();
-      // React's autoFocus would run before showModal(), while the dialog is
-      // still closed and nothing in it can take focus. So the element that
-      // should start with focus is marked data-autofocus and focused here.
-      dialog.querySelector<HTMLElement>('[data-autofocus]')?.focus();
-    }
+    if (dialog && !dialog.open) dialog.showModal();
     return () => {
       dialog?.close();
     };
   }, []);
+
+  // React's autoFocus would run before showModal(), while the dialog is still
+  // closed and nothing in it can take focus. So the element that should start
+  // with focus is marked data-autofocus and focused here, after showModal().
+  // Again whenever the title changes: the same dialog can turn into another
+  // step (a confirm becomes "Cannot delete…"), which removes the button that
+  // had focus.
+  useLayoutEffect(() => {
+    ref.current?.querySelector<HTMLElement>('[data-autofocus]')?.focus();
+  }, [title]);
 
   return (
     <dialog

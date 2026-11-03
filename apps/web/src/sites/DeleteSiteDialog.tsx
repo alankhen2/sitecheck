@@ -35,7 +35,7 @@ export function DeleteSiteDialog({ site, onClose }: Props) {
           >
             View its plants
           </Link>
-          <button type="button" onClick={onClose} className={buttonClass}>
+          <button type="button" data-autofocus onClick={onClose} className={buttonClass}>
             Close
           </button>
         </div>

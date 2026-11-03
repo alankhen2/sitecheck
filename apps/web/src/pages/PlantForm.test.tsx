@@ -1,10 +1,11 @@
 import type { Site } from '@sitecheck/shared';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { http, HttpResponse } from 'msw';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { dataHandlers, makePlant, testPlants, testSites } from '../test/data';
-import { authHandlers, inspectorUser } from '../test/fixtures';
+import { adminUser, authHandlers, inspectorUser } from '../test/fixtures';
 import { renderApp } from '../test/render';
-import { server } from '../test/server';
+import { apiUrl, server } from '../test/server';
 
 // Inspectors may add and edit plants, so most tests use one.
 beforeEach(() => {
@@ -287,5 +288,66 @@ describe('editing a plant', () => {
     });
     // No siteId: the plant is not moved, so the API allows it.
     expect(data.writes[0]?.body).toEqual({ status: 'INACTIVE' });
+  });
+});
+
+describe('deleting a plant', () => {
+  beforeEach(() => {
+    server.use(authHandlers.loggedInAs(adminUser));
+  });
+
+  it('lets an admin delete a plant after confirming', async () => {
+    const data = dataHandlers();
+    server.use(...data.handlers);
+    const { user } = renderApp('/plants');
+    await screen.findByText('Showing 1–3 of 3 plants');
+
+    await user.click(screen.getByRole('button', { name: 'Delete Kalmar Reach Stacker' }));
+    const dialog = screen.getByRole('dialog', { name: 'Delete Kalmar Reach Stacker?' });
+    expect(dialog).toHaveTextContent('Serial number PBT-RS-001 at Port Botany Terminal 3.');
+    expect(within(dialog).getByRole('button', { name: 'Cancel' })).toHaveFocus();
+    await user.click(within(dialog).getByRole('button', { name: 'Delete plant' }));
+
+    expect(await screen.findByText('Showing 1–2 of 2 plants')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(data.writes).toEqual([
+      { method: 'DELETE', path: `/plants/${testPlants[2]?.id ?? ''}`, body: null },
+    ]);
+  });
+
+  it('explains what to do instead for a plant with inspection history', async () => {
+    server.use(...dataHandlers().handlers);
+    server.use(
+      http.delete(apiUrl('/plants/:id'), () =>
+        HttpResponse.json(
+          {
+            message:
+              'Plant has inspection history; set its status to INACTIVE instead of deleting it',
+            code: 'PLANT_HAS_INSPECTIONS',
+          },
+          { status: 409 },
+        ),
+      ),
+    );
+    const { user } = renderApp('/plants');
+    await screen.findByText('Showing 1–3 of 3 plants');
+
+    await user.click(screen.getByRole('button', { name: 'Delete CAT 336 Excavator' }));
+    await user.click(screen.getByRole('button', { name: 'Delete plant' }));
+
+    const dialog = await screen.findByRole('dialog', { name: 'Cannot delete CAT 336 Excavator' });
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('Set its status to Inactive');
+    // The Delete button that had focus is gone; focus moves to Close, not to nowhere.
+    expect(within(dialog).getByRole('button', { name: 'Close' })).toHaveFocus();
+    expect(within(dialog).queryByRole('button', { name: 'Delete plant' })).not.toBeInTheDocument();
+  });
+
+  it('does not offer delete to an inspector, who can still edit', async () => {
+    server.use(authHandlers.loggedInAs(inspectorUser), ...dataHandlers().handlers);
+    renderApp('/plants');
+    await screen.findByText('Showing 1–3 of 3 plants');
+
+    expect(screen.getByRole('button', { name: 'Edit CAT 336 Excavator' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Delete/ })).not.toBeInTheDocument();
   });
 });

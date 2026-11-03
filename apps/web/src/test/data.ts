@@ -234,6 +234,15 @@ export function dataHandlers(
     return HttpResponse.json(plant);
   });
 
+  const deletePlant = http.delete(apiUrl('/plants/:id'), ({ params }) => {
+    writes.push({ method: 'DELETE', path: `/plants/${String(params.id)}`, body: null });
+    const plant = plants.find((p) => p.id === params.id);
+    if (!plant) return notFound('Plant');
+    plants = plants.filter((p) => p !== plant);
+    countPlants();
+    return new HttpResponse(null, { status: 204 });
+  });
+
   return {
     plants: plantsHandler,
     sites: sitesHandler,
@@ -245,6 +254,7 @@ export function dataHandlers(
       deleteSite,
       createPlant,
       updatePlant,
+      deletePlant,
     ],
     requests,
     writes,

@@ -3,6 +3,8 @@ import { useState } from 'react';
 import { Link } from 'react-router';
 import { Pagination } from '../components/Pagination';
 import { userMessage } from '../lib/errors';
+import { useUser } from '../auth/user-context';
+import { DeletePlantDialog } from '../plants/DeletePlantDialog';
 import { PlantFilters } from '../plants/PlantFilters';
 import { PlantFormDialog } from '../plants/PlantFormDialog';
 import { PlantTable } from '../plants/PlantTable';
@@ -11,8 +13,12 @@ import { hasFilters } from '../plants/search-params';
 import { usePlantQuery } from '../plants/usePlantQuery';
 import { useSites } from '../sites/queries';
 
-/** Which dialog is open: none, the add form, or the edit form for one plant. */
-type OpenDialog = { kind: 'none' } | { kind: 'add' } | { kind: 'edit'; plant: Plant };
+/** Which dialog is open: none, the add form, or the edit or delete dialog for one plant. */
+type OpenDialog =
+  | { kind: 'none' }
+  | { kind: 'add' }
+  | { kind: 'edit'; plant: Plant }
+  | { kind: 'delete'; plant: Plant };
 
 const none: OpenDialog = { kind: 'none' };
 
@@ -29,7 +35,9 @@ export function PlantsPage() {
   const [query, update] = usePlantQuery();
   const plants = usePlants(query);
   const filtered = hasFilters(query);
-  // Admins and inspectors (every role) may add and edit plants.
+  // Admins and inspectors (every role) may add and edit plants; only an admin
+  // may delete one. Hiding the button is for the user; the API enforces it.
+  const canDelete = useUser().role === 'ADMIN';
   const [dialog, setDialog] = useState<OpenDialog>(none);
   const closeDialog = () => {
     setDialog(none);
@@ -39,16 +47,30 @@ export function PlantsPage() {
   const filterSite = sites.data?.find((site) => site.id === query.siteId && site.isActive);
 
   const rowActions = (plant: Plant) => (
-    <button
-      type="button"
-      aria-label={`Edit ${plant.name}`}
-      onClick={() => {
-        setDialog({ kind: 'edit', plant });
-      }}
-      className="rounded px-2 py-1 text-amber-700 hover:bg-amber-50"
-    >
-      Edit
-    </button>
+    <>
+      <button
+        type="button"
+        aria-label={`Edit ${plant.name}`}
+        onClick={() => {
+          setDialog({ kind: 'edit', plant });
+        }}
+        className="rounded px-2 py-1 text-amber-700 hover:bg-amber-50"
+      >
+        Edit
+      </button>
+      {canDelete && (
+        <button
+          type="button"
+          aria-label={`Delete ${plant.name}`}
+          onClick={() => {
+            setDialog({ kind: 'delete', plant });
+          }}
+          className="ml-1 rounded px-2 py-1 text-red-700 hover:bg-red-50"
+        >
+          Delete
+        </button>
+      )}
+    </>
   );
 
   return (
@@ -129,6 +151,9 @@ export function PlantsPage() {
       )}
       {dialog.kind === 'edit' && (
         <PlantFormDialog key={dialog.plant.id} plant={dialog.plant} onClose={closeDialog} />
+      )}
+      {dialog.kind === 'delete' && (
+        <DeletePlantDialog key={dialog.plant.id} plant={dialog.plant} onClose={closeDialog} />
       )}
     </section>
   );

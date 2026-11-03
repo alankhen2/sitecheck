@@ -272,6 +272,7 @@ describe('deleting sites', () => {
 
     const dialog = await screen.findByRole('dialog', { name: 'Cannot delete Kwinana Yard' });
     expect(within(dialog).getByRole('alert')).toHaveTextContent('This site still has plants.');
+    expect(within(dialog).getByRole('button', { name: 'Close' })).toHaveFocus();
   });
 
   it('shows other errors in the confirm dialog', async () => {
