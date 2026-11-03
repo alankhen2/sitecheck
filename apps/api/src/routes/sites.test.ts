@@ -212,7 +212,10 @@ describe('DELETE /sites/:id', () => {
     });
 
     expect(res.statusCode).toBe(409);
-    expect(res.json()).toEqual({ message: 'Site still has plants; move or delete them first' });
+    expect(res.json()).toEqual({
+      message: 'Site still has plants; move or delete them first',
+      code: 'SITE_HAS_PLANTS',
+    });
   });
 
   it('returns 403 for an inspector', async () => {

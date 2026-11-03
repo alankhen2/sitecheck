@@ -63,14 +63,24 @@ export interface PlantRepository {
 
 export class SerialNumberTakenError extends ConflictError {
   constructor() {
-    super('Serial number is already used by another plant');
+    super('Serial number is already used by another plant', 'SERIAL_NUMBER_TAKEN');
     this.name = 'SerialNumberTakenError';
+  }
+}
+
+export class SiteInactiveError extends ConflictError {
+  constructor() {
+    super('Cannot place a plant at an inactive site', 'SITE_INACTIVE');
+    this.name = 'SiteInactiveError';
   }
 }
 
 export class PlantHasInspectionsError extends ConflictError {
   constructor() {
-    super('Plant has inspection history; set its status to INACTIVE instead of deleting it');
+    super(
+      'Plant has inspection history; set its status to INACTIVE instead of deleting it',
+      'PLANT_HAS_INSPECTIONS',
+    );
     this.name = 'PlantHasInspectionsError';
   }
 }
@@ -108,7 +118,7 @@ export function createPlantService({ plants, sites }: PlantServiceDeps) {
   async function assertSiteAcceptsPlants(siteId: string): Promise<void> {
     const site = await sites.findById(siteId);
     if (!site) throw new InvalidReferenceError('Site does not exist');
-    if (!site.isActive) throw new ConflictError('Cannot place a plant at an inactive site');
+    if (!site.isActive) throw new SiteInactiveError();
   }
 
   async function assertSerialFree(serialNumber: string, exceptId?: string): Promise<void> {

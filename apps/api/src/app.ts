@@ -11,7 +11,7 @@ import { authRoutes } from './routes/auth.js';
 import { plantRoutes } from './routes/plants.js';
 import { siteRoutes } from './routes/sites.js';
 import type { AuthService } from './services/auth.service.js';
-import { DomainError } from './services/errors.js';
+import { DomainError, toErrorResponse } from './services/errors.js';
 import type { PlantService } from './services/plants.service.js';
 import type { SiteService } from './services/sites.service.js';
 
@@ -38,11 +38,16 @@ export async function buildApp({ config, auth, sites, plants }: AppDeps) {
   app.setErrorHandler<FastifyError>((error, request, reply) => {
     // Business-rule errors from services: their own status (404, 409, 400) and message.
     if (error instanceof DomainError) {
-      return reply.code(error.statusCode).send({ message: error.message });
+      return reply.code(error.statusCode).send(toErrorResponse(error));
     }
     // Fastify's own client errors (validation 400, payload too large 413, ...)
-    // describe the request, so its default handler may show them.
-    if (error.statusCode !== undefined && error.statusCode < 500) throw error;
+    // describe the request, so their message may be shown. The body is built
+    // here so every error has one shape, { message, code? }: Fastify's default
+    // body has its own `code` ("FST_ERR_VALIDATION"), which is not one of ours
+    // and would fail a route's errorResponseSchema.
+    if (error.statusCode !== undefined && error.statusCode < 500) {
+      return reply.code(error.statusCode).send({ message: error.message });
+    }
     // Anything else is a bug or an outage. Fastify's default 500 would echo
     // error.message to the client, and a database error message can contain
     // hosts, SQL or credentials, so log the details and send a generic body.

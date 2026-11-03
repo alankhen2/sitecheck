@@ -72,7 +72,10 @@ describe('sites', () => {
 
     const res = await admin.delete(`/sites/${site.id}`).expect(409);
 
-    expect(res.body).toEqual({ message: 'Site still has plants; move or delete them first' });
+    expect(res.body).toEqual({
+      message: 'Site still has plants; move or delete them first',
+      code: 'SITE_HAS_PLANTS',
+    });
     expect(await prisma.plant.count()).toBe(1);
   });
 });

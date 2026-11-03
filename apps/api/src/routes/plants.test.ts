@@ -166,6 +166,10 @@ describe('POST /plants', () => {
     });
 
     expect(res.statusCode).toBe(409);
+    expect(res.json()).toEqual({
+      message: 'Cannot place a plant at an inactive site',
+      code: 'SITE_INACTIVE',
+    });
   });
 
   it('returns 409 for a duplicate serial number', async () => {
@@ -179,7 +183,11 @@ describe('POST /plants', () => {
     });
 
     expect(res.statusCode).toBe(409);
-    expect(res.json()).toEqual({ message: 'Serial number is already used by another plant' });
+    // The code lets the web app put this error on the serial number field.
+    expect(res.json()).toEqual({
+      message: 'Serial number is already used by another plant',
+      code: 'SERIAL_NUMBER_TAKEN',
+    });
   });
 
   it('returns 400 for an unknown status', async () => {
@@ -193,6 +201,8 @@ describe('POST /plants', () => {
     });
 
     expect(res.statusCode).toBe(400);
+    // Same shape as every other error: no Fastify-internal fields such as code: 'FST_ERR_VALIDATION'.
+    expect(Object.keys(res.json<object>())).toEqual(['message']);
   });
 });
 
@@ -222,6 +232,7 @@ describe('PATCH /plants/:id', () => {
     });
 
     expect(res.statusCode).toBe(409);
+    expect(res.json()).toMatchObject({ code: 'SITE_INACTIVE' });
   });
 
   it('returns 404 for an unknown id', async () => {
@@ -263,6 +274,7 @@ describe('DELETE /plants/:id', () => {
     });
 
     expect(res.statusCode).toBe(409);
+    expect(res.json()).toMatchObject({ code: 'PLANT_HAS_INSPECTIONS' });
     expect(plants.rows).toHaveLength(2);
   });
 

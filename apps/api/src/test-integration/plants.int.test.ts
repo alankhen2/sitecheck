@@ -63,6 +63,9 @@ describe('create and update', () => {
     );
 
     expect([a?.status, b?.status].sort()).toEqual([201, 409]);
+    // The loser may fail at the check or at the unique index; both carry the code.
+    const loser = [a, b].find((res) => res?.status === 409);
+    expect(loser?.body).toMatchObject({ code: 'SERIAL_NUMBER_TAKEN' });
     expect(await prisma.plant.count()).toBe(1);
   });
 

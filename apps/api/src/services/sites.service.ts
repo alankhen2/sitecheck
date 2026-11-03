@@ -28,7 +28,7 @@ export interface SiteRepository {
 
 export class SiteHasPlantsError extends ConflictError {
   constructor() {
-    super('Site still has plants; move or delete them first');
+    super('Site still has plants; move or delete them first', 'SITE_HAS_PLANTS');
     this.name = 'SiteHasPlantsError';
   }
 }
