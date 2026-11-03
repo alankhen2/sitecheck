@@ -2,9 +2,7 @@ import { useEffect, useState } from 'react';
 import { healthResponseSchema, type HealthResponse } from '@sitecheck/shared';
 
 type State =
-  | { kind: 'loading' }
-  | { kind: 'ok'; data: HealthResponse }
-  | { kind: 'error'; message: string };
+  { kind: 'loading' } | { kind: 'ok'; data: HealthResponse } | { kind: 'error'; message: string };
 
 export function App() {
   const [state, setState] = useState<State>({ kind: 'loading' });
@@ -12,10 +10,12 @@ export function App() {
   useEffect(() => {
     fetch('/api/health')
       .then((res) => res.json())
-      .then((json: unknown) => setState({ kind: 'ok', data: healthResponseSchema.parse(json) }))
-      .catch((err: unknown) =>
-        setState({ kind: 'error', message: err instanceof Error ? err.message : String(err) }),
-      );
+      .then((json: unknown) => {
+        setState({ kind: 'ok', data: healthResponseSchema.parse(json) });
+      })
+      .catch((err: unknown) => {
+        setState({ kind: 'error', message: err instanceof Error ? err.message : String(err) });
+      });
   }, []);
 
   return (
