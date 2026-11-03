@@ -15,7 +15,7 @@ pnpm monorepo:
   - `src/lib/`: pure helpers (e.g. `password.ts`, scrypt hashing).
   - `src/services/`: business rules, depending on repository interfaces (not Prisma); must have unit tests.
   - `src/repositories/`: Prisma implementations of those interfaces.
-  - `src/plugins/auth.ts`: JWT session cookie, `app.authenticate` (401) and `app.requireRole(...)` (401/403) preHandlers; `request.user` is loaded from the db each request.
+  - `src/plugins/auth.ts`: JWT session cookie, `app.authenticate` (401) and `app.requireRole(...)` (401/403), used as `onRequest` hooks so auth runs before body validation; `request.user` is loaded from the db each request.
   - `src/routes/`: thin HTTP handlers with Zod `schema` (body/query/params/response) via `fastify-type-provider-zod`.
   - `src/test-utils/`: in-memory fakes for tests (excluded from the build).
   - `prisma/schema.prisma`, `prisma/migrations/`; client generated to `src/generated/` (gitignored).

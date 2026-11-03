@@ -15,7 +15,12 @@ const SESSION_SECONDS = 8 * 60 * 60; // one work shift
 const tokenPayloadSchema = z.object({ sub: z.uuid() });
 type TokenPayload = z.infer<typeof tokenPayloadSchema>;
 
-type PreHandler = (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+/**
+ * Use as an `onRequest` hook, not `preHandler`: onRequest runs before the body is
+ * parsed and validated, so an anonymous request gets 401 instead of a 400 that
+ * describes the schema.
+ */
+type AuthHook = (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
 
 declare module '@fastify/jwt' {
   interface FastifyJWT {
@@ -26,10 +31,10 @@ declare module '@fastify/jwt' {
 
 declare module 'fastify' {
   interface FastifyInstance {
-    /** preHandler: 401 unless the request has a valid session for an existing user. */
-    authenticate: PreHandler;
-    /** preHandler: authenticates, then 403 unless the user has one of `roles`. */
-    requireRole: (...roles: Role[]) => PreHandler;
+    /** onRequest hook: 401 unless the request has a valid session for an existing user. */
+    authenticate: AuthHook;
+    /** onRequest hook: authenticates, then 403 unless the user has one of `roles`. */
+    requireRole: (...roles: Role[]) => AuthHook;
   }
   interface FastifyReply {
     startSession(userId: string): Promise<void>;
@@ -77,7 +82,7 @@ export const authPlugin = fp<AuthPluginOptions>(
     const unauthorized = (reply: FastifyReply) =>
       reply.code(401).send({ message: 'Authentication required' });
 
-    const authenticate: PreHandler = async (request, reply) => {
+    const authenticate: AuthHook = async (request, reply) => {
       const token = request.cookies[SESSION_COOKIE];
       if (!token) return unauthorized(reply);
 
@@ -96,7 +101,7 @@ export const authPlugin = fp<AuthPluginOptions>(
 
     app.decorate('authenticate', authenticate);
 
-    app.decorate('requireRole', (...roles: Role[]): PreHandler => {
+    app.decorate('requireRole', (...roles: Role[]): AuthHook => {
       return async (request, reply) => {
         await authenticate(request, reply);
         if (reply.sent) return;

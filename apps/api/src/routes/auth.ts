@@ -67,7 +67,7 @@ export const authRoutes: FastifyPluginAsyncZod<{ auth: AuthService }> = async (a
   app.get(
     '/auth/me',
     {
-      preHandler: app.authenticate,
+      onRequest: app.authenticate,
       schema: { response: { 200: publicUserSchema, 401: errorResponseSchema } },
     },
     (request) => request.user,

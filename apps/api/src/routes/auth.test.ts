@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { z } from 'zod';
 import { buildApp } from '../app.js';
 import { loadConfig } from '../config.js';
 import { SESSION_COOKIE } from '../plugins/auth.js';
@@ -21,8 +22,16 @@ async function setup(initial: UserRecord[] = [testUsers.admin, testUsers.inspect
   const app = await buildApp({ config, auth });
 
   // Test-only routes to exercise the guards the real routes will use.
-  app.get('/test/any-user', { preHandler: app.authenticate }, (req) => ({ id: req.user.id }));
-  app.get('/test/admin-only', { preHandler: app.requireRole('ADMIN') }, () => ({ ok: true }));
+  app.get('/test/any-user', { onRequest: app.authenticate }, (req) => ({ id: req.user.id }));
+  app.get('/test/admin-only', { onRequest: app.requireRole('ADMIN') }, () => ({ ok: true }));
+  app.post(
+    '/test/admin-with-body',
+    {
+      onRequest: app.requireRole('ADMIN'),
+      schema: { body: z.object({ name: z.string().min(1) }) },
+    },
+    () => ({ ok: true }),
+  );
 
   return { app, users };
 }
@@ -231,6 +240,28 @@ describe('authenticate (GET /auth/me)', () => {
 });
 
 describe('requireRole', () => {
+  it('checks the session before validating the body', async () => {
+    const { app } = await setup();
+    const token = await loginAs(app, testUsers.inspector.email, 'correct horse battery');
+    const badBody = { name: '' };
+
+    const anonymous = await app.inject({
+      method: 'POST',
+      url: '/test/admin-with-body',
+      payload: badBody,
+    });
+    const inspector = await app.inject({
+      method: 'POST',
+      url: '/test/admin-with-body',
+      payload: badBody,
+      cookies: withSession(token),
+    });
+
+    // Not 400: someone without access learns nothing about the schema.
+    expect(anonymous.statusCode).toBe(401);
+    expect(inspector.statusCode).toBe(403);
+  });
+
   it('returns 401 when not logged in', async () => {
     const { app } = await setup();
 
