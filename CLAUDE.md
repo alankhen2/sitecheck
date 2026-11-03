@@ -9,12 +9,13 @@ pnpm monorepo:
 
 - `apps/web`: React 19 + TypeScript + Vite. Dev server proxies `/api/*` to the API.
 - `apps/api`: Fastify 5 + TypeScript + Prisma 7 (PostgreSQL via `@prisma/adapter-pg`).
-  - `src/app.ts`: `buildApp({ config, auth })` builds the app without listening; tests pass fakes. `src/server.ts` wires the real dependencies and listens.
+  - `src/app.ts`: `buildApp({ config, auth, sites, plants })` builds the app without listening; tests use `buildTestApp` from `src/test-utils/app.ts`. `src/server.ts` wires the real dependencies and listens.
+  - Errors: services throw `DomainError` subclasses from `src/services/errors.ts` (404/409/400); the error handler in `app.ts` sends `{ message }`. Unexpected errors get a generic 500 body (details only in the log).
   - `src/config.ts`: env parsed with Zod at startup (`JWT_SECRET` required, 32+ chars).
   - `src/db.ts` exports the single shared `prisma` client.
   - `src/lib/`: pure helpers (e.g. `password.ts`, scrypt hashing).
   - `src/services/`: business rules, depending on repository interfaces (not Prisma); must have unit tests.
-  - `src/repositories/`: Prisma implementations of those interfaces.
+  - `src/repositories/`: Prisma implementations of those interfaces; they map Prisma error codes (`src/lib/prisma-errors.ts`) to domain errors for check-then-write races.
   - `src/plugins/auth.ts`: JWT session cookie, `app.authenticate` (401) and `app.requireRole(...)` (401/403), used as `onRequest` hooks so auth runs before body validation; `request.user` is loaded from the db each request.
   - `src/routes/`: thin HTTP handlers with Zod `schema` (body/query/params/response) via `fastify-type-provider-zod`.
   - `src/test-utils/`: in-memory fakes for tests (excluded from the build).
