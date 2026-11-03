@@ -2,8 +2,16 @@ import { buildApp } from '../app.js';
 import { loadConfig, type Config } from '../config.js';
 import { SESSION_COOKIE } from '../plugins/auth.js';
 import { createAuthService, type UserRecord } from '../services/auth.service.js';
+import { createPlantService, type PlantRecord } from '../services/plants.service.js';
 import { createSiteService, type SiteRecord } from '../services/sites.service.js';
-import { fakeHashPassword, fakeSites, fakeUsers, fakeVerifyPassword, testUsers } from './fakes.js';
+import {
+  fakeHashPassword,
+  fakePlants,
+  fakeSites,
+  fakeUsers,
+  fakeVerifyPassword,
+  testUsers,
+} from './fakes.js';
 
 export const testConfig = loadConfig({
   NODE_ENV: 'test',
@@ -19,6 +27,9 @@ export const testPasswords = {
 interface Seed {
   users?: UserRecord[];
   sites?: SiteRecord[];
+  plants?: PlantRecord[];
+  /** plant id -> number of inspections */
+  inspectionCounts?: Record<string, number>;
   config?: Config;
 }
 
@@ -26,6 +37,7 @@ interface Seed {
 export async function buildTestApp(seed: Seed = {}) {
   const users = fakeUsers(seed.users ?? [testUsers.admin, testUsers.inspector]);
   const sites = fakeSites(seed.sites ?? []);
+  const plants = fakePlants(sites, seed.plants ?? [], seed.inspectionCounts ?? {});
   const app = await buildApp({
     config: seed.config ?? testConfig,
     auth: createAuthService({
@@ -34,8 +46,9 @@ export async function buildTestApp(seed: Seed = {}) {
       verifyPassword: fakeVerifyPassword,
     }),
     sites: createSiteService({ sites }),
+    plants: createPlantService({ plants, sites }),
   });
-  return { app, users, sites };
+  return { app, users, sites, plants };
 }
 
 export type TestApp = Awaited<ReturnType<typeof buildTestApp>>['app'];

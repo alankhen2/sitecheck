@@ -1,11 +1,10 @@
 import type { Role } from '@sitecheck/shared';
 import { Prisma, type PrismaClient, type Role as DbRole } from '../generated/prisma/client.js';
+import type { Assert, Same } from '../lib/types.js';
 import { EmailTakenError, type UserRepository } from '../services/auth.service.js';
 
 // Compile-time check that the shared Zod role enum and the Prisma enum have the
 // same values. If someone adds a role to only one of them, typecheck fails here.
-type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
-type Assert<T extends true> = T;
 export type RolesMatch = Assert<Same<Role, DbRole>>;
 
 // Only the columns the auth rules use; nothing else is read.

@@ -5,7 +5,13 @@ import {
   type UserRecord,
   type UserRepository,
 } from '../services/auth.service.js';
-import { NotFoundError } from '../services/errors.js';
+import { InvalidReferenceError, NotFoundError } from '../services/errors.js';
+import {
+  PlantHasInspectionsError,
+  SerialNumberTakenError,
+  type PlantRecord,
+  type PlantRepository,
+} from '../services/plants.service.js';
 import {
   SiteHasPlantsError,
   type SiteRecord,
@@ -120,3 +126,107 @@ export const testUsers = {
     passwordHash: 'hashed:correct horse battery',
   },
 } satisfies Record<string, UserRecord>;
+
+/**
+ * In-memory PlantRepository on top of a fake site store. It keeps each site's
+ * plantCount and the plant's siteName in step, like the database's join and count.
+ * `inspectionCounts` stands in for the inspections table (plant id -> count).
+ */
+export function fakePlants(
+  sites: { rows: SiteRecord[] },
+  initial: PlantRecord[] = [],
+  inspectionCounts: Record<string, number> = {},
+): PlantRepository & { rows: PlantRecord[] } {
+  const rows = initial.map(copy);
+  const find = (id: string) => rows.find((p) => p.id === id);
+  const site = (id: string) => sites.rows.find((s) => s.id === id);
+  const bump = (siteId: string, by: number) => {
+    const s = site(siteId);
+    if (s) s.plantCount += by;
+  };
+  const serialTaken = (serial: string, exceptId?: string) =>
+    rows.some((p) => p.serialNumber === serial && p.id !== exceptId);
+
+  return {
+    rows,
+    list: ({ siteId }) =>
+      Promise.resolve(
+        rows
+          .filter((p) => siteId === undefined || p.siteId === siteId)
+          .sort((a, b) => a.name.localeCompare(b.name))
+          .map(copy),
+      ),
+    findById: (id) => {
+      const plant = find(id);
+      return Promise.resolve(plant ? copy(plant) : null);
+    },
+    findBySerialNumber: (serial) => {
+      const plant = rows.find((p) => p.serialNumber === serial);
+      return Promise.resolve(plant ? copy(plant) : null);
+    },
+    countInspections: (id) => Promise.resolve(inspectionCounts[id] ?? 0),
+    create: (data) => {
+      const s = site(data.siteId);
+      if (!s) return Promise.reject(new InvalidReferenceError('Site does not exist'));
+      if (serialTaken(data.serialNumber)) return Promise.reject(new SerialNumberTakenError());
+      const now = new Date();
+      const plant = { ...data, id: randomUUID(), siteName: s.name, createdAt: now, updatedAt: now };
+      rows.push(plant);
+      bump(plant.siteId, 1);
+      return Promise.resolve(copy(plant));
+    },
+    update: (id, changes) => {
+      const plant = find(id);
+      if (!plant) return Promise.reject(new NotFoundError('Plant'));
+      if (changes.serialNumber !== undefined && serialTaken(changes.serialNumber, id)) {
+        return Promise.reject(new SerialNumberTakenError());
+      }
+      if (changes.siteId !== undefined && changes.siteId !== plant.siteId) {
+        const target = site(changes.siteId);
+        if (!target) return Promise.reject(new InvalidReferenceError('Site does not exist'));
+        bump(plant.siteId, -1);
+        bump(target.id, 1);
+        plant.siteName = target.name;
+      }
+      Object.assign(plant, changes, { updatedAt: new Date() });
+      return Promise.resolve(copy(plant));
+    },
+    delete: (id) => {
+      const index = rows.findIndex((p) => p.id === id);
+      const plant = rows[index];
+      if (!plant) return Promise.reject(new NotFoundError('Plant'));
+      if ((inspectionCounts[id] ?? 0) > 0) return Promise.reject(new PlantHasInspectionsError());
+      rows.splice(index, 1);
+      bump(plant.siteId, -1);
+      return Promise.resolve();
+    },
+  };
+}
+
+/** Both at testSites.quarry (plantCount 2). The excavator has inspection history in most tests. */
+export const testPlants = {
+  excavator: {
+    id: '019a0000-0000-7000-8000-000000000601',
+    siteId: testSites.quarry.id,
+    siteName: testSites.quarry.name,
+    name: 'CAT 336 Excavator',
+    type: 'Excavator',
+    serialNumber: 'WGQ-EX-001',
+    status: 'ACTIVE',
+    nextInspectionAt: day('2026-11-05'),
+    createdAt: day('2026-10-01'),
+    updatedAt: day('2026-10-01'),
+  },
+  loader: {
+    id: '019a0000-0000-7000-8000-000000000602',
+    siteId: testSites.quarry.id,
+    siteName: testSites.quarry.name,
+    name: 'CAT 980 Wheel Loader',
+    type: 'Wheel loader',
+    serialNumber: 'WGQ-WL-002',
+    status: 'ACTIVE',
+    nextInspectionAt: null,
+    createdAt: day('2026-10-01'),
+    updatedAt: day('2026-10-01'),
+  },
+} satisfies Record<string, PlantRecord>;
