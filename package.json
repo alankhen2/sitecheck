@@ -7,8 +7,8 @@
     "dev": "pnpm --filter @sitecheck/shared build && pnpm -r --parallel dev",
     "build": "pnpm -r build",
     "test": "pnpm -r --if-present test",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
+    "lint": "pnpm --filter @sitecheck/shared build && eslint .",
+    "lint:fix": "pnpm --filter @sitecheck/shared build && eslint . --fix",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
     "typecheck": "pnpm --filter @sitecheck/shared build && pnpm -r typecheck"
