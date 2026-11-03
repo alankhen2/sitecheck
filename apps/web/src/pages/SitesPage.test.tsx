@@ -1,7 +1,8 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { dataHandlers, testSites } from '../test/data';
+import type { Site } from '@sitecheck/shared';
+import { dataHandlers, makePlant, testPlants, testSites } from '../test/data';
 import { adminUser, authHandlers, inspectorUser } from '../test/fixtures';
 import { currentUrl, renderApp } from '../test/render';
 import { apiUrl, server } from '../test/server';
@@ -79,6 +80,7 @@ describe('adding and editing sites', () => {
 
     await user.click(screen.getByRole('button', { name: 'Add site' }));
     const dialog = screen.getByRole('dialog', { name: 'Add site' });
+    expect(within(dialog).getByLabelText('Name')).toHaveFocus();
     await user.type(within(dialog).getByLabelText('Name'), '  Kwinana Yard ');
     await user.type(within(dialog).getByLabelText('Address'), '5 Rockingham Rd, Kwinana WA 6167');
     await user.click(within(dialog).getByRole('button', { name: 'Add site' }));
@@ -195,5 +197,103 @@ describe('adding and editing sites', () => {
     await screen.findByRole('table', { name: 'Sites' });
     expect(screen.queryByRole('button', { name: 'Add site' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Edit/ })).not.toBeInTheDocument();
+  });
+});
+
+describe('deleting sites', () => {
+  const emptySite: Site = {
+    id: '019a0000-0000-7000-8000-000000000003',
+    name: 'Kwinana Yard',
+    address: '5 Rockingham Rd, Kwinana WA 6167',
+    isActive: false,
+    plantCount: 0,
+    createdAt: '2026-10-01T00:00:00.000Z',
+    updatedAt: '2026-10-01T00:00:00.000Z',
+  };
+
+  it('deletes a site without plants after confirming', async () => {
+    const data = dataHandlers(testPlants, [...testSites, emptySite]);
+    server.use(...data.handlers);
+    const { user } = renderApp('/sites');
+
+    await user.click(await screen.findByRole('button', { name: 'Delete Kwinana Yard' }));
+    const dialog = screen.getByRole('dialog', { name: 'Delete Kwinana Yard?' });
+    // The safe choice has the focus, so a stray Enter does not delete.
+    expect(within(dialog).getByRole('button', { name: 'Cancel' })).toHaveFocus();
+    await user.click(within(dialog).getByRole('button', { name: 'Delete site' }));
+
+    await waitFor(() => {
+      expect(rowNames()).toEqual(['Port Botany Terminal 3', 'Westgate Quarry']);
+    });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(data.writes).toEqual([{ method: 'DELETE', path: `/sites/${emptySite.id}`, body: null }]);
+  });
+
+  it('cancelling deletes nothing', async () => {
+    const data = dataHandlers(testPlants, [...testSites, emptySite]);
+    server.use(...data.handlers);
+    const { user } = renderApp('/sites');
+
+    await user.click(await screen.findByRole('button', { name: 'Delete Kwinana Yard' }));
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(rowNames()).toContain('Kwinana Yard');
+    expect(data.writes).toEqual([]);
+  });
+
+  it('explains instead of offering a delete when the site has plants', async () => {
+    const data = dataHandlers();
+    server.use(...data.handlers);
+    const { router, user } = renderApp('/sites');
+
+    await user.click(await screen.findByRole('button', { name: 'Delete Westgate Quarry' }));
+    const dialog = screen.getByRole('dialog', { name: 'Cannot delete Westgate Quarry' });
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('This site still has plants.');
+    expect(within(dialog).queryByRole('button', { name: 'Delete site' })).not.toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole('link', { name: 'View its plants' }));
+    expect(currentUrl(router)).toBe(`/plants?siteId=${testSites[1]?.id ?? ''}`);
+    expect(data.writes).toEqual([]);
+  });
+
+  it('gives the same explanation when the API says the site gained plants meanwhile', async () => {
+    // The list says 0 plants, but the server has one at this site: a 409.
+    const stale = { ...emptySite, isActive: true };
+    const data = dataHandlers(
+      [...testPlants, makePlant({ siteId: stale.id, siteName: stale.name })],
+      [...testSites, stale],
+    );
+    server.use(...data.handlers);
+    const { user } = renderApp('/sites');
+
+    await user.click(await screen.findByRole('button', { name: 'Delete Kwinana Yard' }));
+    await user.click(screen.getByRole('button', { name: 'Delete site' }));
+
+    const dialog = await screen.findByRole('dialog', { name: 'Cannot delete Kwinana Yard' });
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('This site still has plants.');
+  });
+
+  it('shows other errors in the confirm dialog', async () => {
+    server.use(...dataHandlers(testPlants, [...testSites, emptySite]).handlers);
+    server.use(
+      http.delete(apiUrl('/sites/:id'), () =>
+        HttpResponse.json({ message: 'Site not found' }, { status: 404 }),
+      ),
+    );
+    const { user } = renderApp('/sites');
+
+    await user.click(await screen.findByRole('button', { name: 'Delete Kwinana Yard' }));
+    await user.click(screen.getByRole('button', { name: 'Delete site' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Site not found');
+  });
+
+  it('does not offer delete to an inspector', async () => {
+    server.use(authHandlers.loggedInAs(inspectorUser), ...dataHandlers().handlers);
+    renderApp('/sites');
+
+    await screen.findByRole('table', { name: 'Sites' });
+    expect(screen.queryByRole('button', { name: /Delete/ })).not.toBeInTheDocument();
   });
 });

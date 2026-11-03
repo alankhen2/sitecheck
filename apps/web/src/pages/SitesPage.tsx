@@ -2,12 +2,17 @@ import type { Site } from '@sitecheck/shared';
 import { useState } from 'react';
 import { useUser } from '../auth/user-context';
 import { userMessage } from '../lib/errors';
+import { DeleteSiteDialog } from '../sites/DeleteSiteDialog';
 import { useSites } from '../sites/queries';
 import { SiteFormDialog } from '../sites/SiteFormDialog';
 import { SiteTable } from '../sites/SiteTable';
 
-/** Which dialog is open: none, the add form, or the edit form for one site. */
-type OpenDialog = { kind: 'none' } | { kind: 'add' } | { kind: 'edit'; site: Site };
+/** Which dialog is open: none, the add form, or the edit or delete dialog for one site. */
+type OpenDialog =
+  | { kind: 'none' }
+  | { kind: 'add' }
+  | { kind: 'edit'; site: Site }
+  | { kind: 'delete'; site: Site };
 
 const none: OpenDialog = { kind: 'none' };
 
@@ -21,16 +26,28 @@ export function SitesPage() {
   };
 
   const rowActions = (site: Site) => (
-    <button
-      type="button"
-      aria-label={`Edit ${site.name}`}
-      onClick={() => {
-        setDialog({ kind: 'edit', site });
-      }}
-      className="rounded px-2 py-1 text-amber-700 hover:bg-amber-50"
-    >
-      Edit
-    </button>
+    <>
+      <button
+        type="button"
+        aria-label={`Edit ${site.name}`}
+        onClick={() => {
+          setDialog({ kind: 'edit', site });
+        }}
+        className="rounded px-2 py-1 text-amber-700 hover:bg-amber-50"
+      >
+        Edit
+      </button>
+      <button
+        type="button"
+        aria-label={`Delete ${site.name}`}
+        onClick={() => {
+          setDialog({ kind: 'delete', site });
+        }}
+        className="ml-1 rounded px-2 py-1 text-red-700 hover:bg-red-50"
+      >
+        Delete
+      </button>
+    </>
   );
 
   return (
@@ -82,6 +99,9 @@ export function SitesPage() {
       {dialog.kind === 'edit' && (
         // key: editing another site starts a fresh form, not the previous one's values.
         <SiteFormDialog key={dialog.site.id} site={dialog.site} onClose={closeDialog} />
+      )}
+      {dialog.kind === 'delete' && (
+        <DeleteSiteDialog key={dialog.site.id} site={dialog.site} onClose={closeDialog} />
       )}
     </section>
   );

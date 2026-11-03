@@ -1,7 +1,7 @@
 import { siteSchema, type CreateSiteBody, type Site, type UpdateSiteBody } from '@sitecheck/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
-import { apiFetch } from '../lib/api';
+import { apiFetch, apiFetchEmpty } from '../lib/api';
 import { plantKeys } from '../plants/queries';
 
 const siteListSchema = z.array(siteSchema);
@@ -50,5 +50,15 @@ export function useUpdateSite() {
         queryClient.invalidateQueries({ queryKey: siteKeys.all }),
         queryClient.invalidateQueries({ queryKey: plantKeys.all }),
       ]),
+  });
+}
+
+export function useDeleteSite() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: Site['id']) => apiFetchEmpty(`/sites/${id}`, { method: 'DELETE' }),
+    // Only a site without plants can be deleted, so no plant row changes. After
+    // a 409 the refetch also corrects a plant count that was out of date.
+    onSettled: () => queryClient.invalidateQueries({ queryKey: siteKeys.all }),
   });
 }

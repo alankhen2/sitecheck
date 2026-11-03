@@ -72,7 +72,7 @@ export function SiteFormDialog({ site, onClose }: Props) {
         </label>
         <input
           id="site-name"
-          autoFocus
+          data-autofocus
           aria-invalid={errors.name ? true : undefined}
           aria-describedby={errors.name ? 'site-name-error' : undefined}
           {...register('name')}

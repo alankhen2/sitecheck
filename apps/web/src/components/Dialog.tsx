@@ -15,6 +15,7 @@ interface Props {
  *
  * The parent renders it only while it is open: mounting opens it, unmounting
  * closes it. That keeps "is it open?" in React state instead of in the DOM.
+ * Mark the element that should get focus first with `data-autofocus`.
  */
 export function Dialog({ title, onClose, children }: Props) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -22,7 +23,13 @@ export function Dialog({ title, onClose, children }: Props) {
 
   useEffect(() => {
     const dialog = ref.current;
-    if (dialog && !dialog.open) dialog.showModal();
+    if (dialog && !dialog.open) {
+      dialog.showModal();
+      // React's autoFocus would run before showModal(), while the dialog is
+      // still closed and nothing in it can take focus. So the element that
+      // should start with focus is marked data-autofocus and focused here.
+      dialog.querySelector<HTMLElement>('[data-autofocus]')?.focus();
+    }
     return () => {
       dialog?.close();
     };
