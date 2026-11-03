@@ -21,8 +21,25 @@ jobs:
     timeout-minutes: 15
     env:
       # prisma.config.ts requires DATABASE_URL even for `prisma generate`.
-      # Nothing connects to it in CI yet; tests that need a database will add a postgres service.
+      # Nothing connects to it; integration tests use TEST_DATABASE_URL below.
       DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+
+    # Same image as docker-compose.yml, so CI tests the Postgres version we develop on.
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: sitecheck
+          POSTGRES_PASSWORD: sitecheck
+          POSTGRES_DB: sitecheck_test
+        ports:
+          - 5432:5432
+        # Steps start only once Postgres accepts connections.
+        options: >-
+          --health-cmd "pg_isready -U sitecheck -d sitecheck_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
 
     steps:
       # Actions are pinned to a full commit SHA (tag in the comment), so a
@@ -53,6 +70,11 @@ jobs:
 
       - name: Test
         run: pnpm test
+
+      - name: Integration tests
+        run: pnpm test:integration
+        env:
+          TEST_DATABASE_URL: postgresql://sitecheck:sitecheck@localhost:5432/sitecheck_test
 
       - name: Build
         run: pnpm build
