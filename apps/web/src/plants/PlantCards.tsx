@@ -1,5 +1,6 @@
 import type { Plant } from '@sitecheck/shared';
 import type { ReactNode } from 'react';
+import { Link } from 'react-router';
 import { NextInspection } from './NextInspection';
 import { StatusBadge } from './StatusBadge';
 
@@ -31,7 +32,14 @@ export function PlantCards({ plants, stale, actions }: Props) {
         <li key={plant.id} className="rounded-lg border border-slate-200 bg-white p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <h2 className="font-medium break-words text-slate-900">{plant.name}</h2>
+              <h2 className="font-medium break-words text-slate-900">
+                <Link
+                  to={`/plants/${plant.id}`}
+                  className="underline decoration-slate-300 underline-offset-2"
+                >
+                  {plant.name}
+                </Link>
+              </h2>
               <p className="text-sm break-words text-slate-500">{plant.type}</p>
             </div>
             <StatusBadge status={plant.status} />

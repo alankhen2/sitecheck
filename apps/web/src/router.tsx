@@ -1,8 +1,10 @@
 import { createBrowserRouter, Navigate, type RouteObject } from 'react-router';
 import { RequireAuth } from './auth/RequireAuth';
 import { AppLayout } from './components/AppLayout';
+import { InspectPage } from './pages/InspectPage';
 import { LoginPage } from './pages/LoginPage';
 import { NotFoundPage } from './pages/NotFoundPage';
+import { PlantDetailPage } from './pages/PlantDetailPage';
 import { PlantsPage } from './pages/PlantsPage';
 import { SitesPage } from './pages/SitesPage';
 
@@ -22,6 +24,8 @@ export const routes: RouteObject[] = [
         children: [
           { index: true, element: <Navigate to="/plants" replace /> },
           { path: 'plants', element: <PlantsPage /> },
+          { path: 'plants/:id', element: <PlantDetailPage /> },
+          { path: 'plants/:id/inspect', element: <InspectPage /> },
           { path: 'sites', element: <SitesPage /> },
         ],
       },

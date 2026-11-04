@@ -7,7 +7,7 @@ import {
   type UpdatePlantBody,
 } from '@sitecheck/shared';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { apiFetch, apiFetchEmpty } from '../lib/api';
+import { ApiError, apiFetch, apiFetchEmpty } from '../lib/api';
 import { siteKeys } from '../sites/keys';
 import { plantKeys } from './keys';
 import { plantQueryToParams } from './search-params';
@@ -24,6 +24,19 @@ export function usePlants(query: ListPlantsQuery) {
     // (dimmed) instead of flashing an empty table.
     placeholderData: keepPreviousData,
   });
+}
+
+/** One plant, for the pages about it. */
+export function usePlant(id: Plant['id']) {
+  return useQuery({
+    queryKey: plantKeys.detail(id),
+    queryFn: ({ signal }) => apiFetch(`/plants/${id}`, plantSchema, { signal }),
+  });
+}
+
+/** 404, or 400 for an address whose id is not even a valid id: there is no such plant. */
+export function isPlantNotFound(error: unknown): boolean {
+  return error instanceof ApiError && (error.status === 404 || error.status === 400);
 }
 
 /**

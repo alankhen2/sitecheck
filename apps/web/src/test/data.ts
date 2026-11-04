@@ -1,11 +1,13 @@
-import type {
-  CreatePlantBody,
-  CreateSiteBody,
-  ErrorCode,
-  Plant,
-  Site,
-  UpdatePlantBody,
-  UpdateSiteBody,
+import {
+  createInspectionBodySchema,
+  type CreatePlantBody,
+  type CreateSiteBody,
+  type ErrorCode,
+  type Inspection,
+  type Plant,
+  type Site,
+  type UpdatePlantBody,
+  type UpdateSiteBody,
 } from '@sitecheck/shared';
 import { http, HttpResponse } from 'msw';
 import { apiUrl } from './server';
@@ -90,14 +92,17 @@ export interface WriteRequest {
  * its plants too) and deleting a site that still has plants is a 409. Each
  * call starts from fresh copies, so one test's changes never leak into the
  * next. Every /plants request URL is recorded in `requests`, every write in
- * `writes`.
+ * `writes`. A new inspection goes through the real shared schema, so a form that
+ * sends something the API would refuse fails here too.
  */
 export function dataHandlers(
   initialPlants: Plant[] = testPlants,
   initialSites: Site[] = testSites,
+  initialInspections: Inspection[] = [],
 ) {
   let plants = initialPlants.map((plant) => ({ ...plant }));
   let sites = initialSites.map((site) => ({ ...site }));
+  let inspections = [...initialInspections];
   const requests: URL[] = [];
   const writes: WriteRequest[] = [];
   let created = 0;
@@ -159,6 +164,62 @@ export function dataHandlers(
       totalPages: Math.ceil(matches.length / pageSize),
     });
   });
+
+  const plantHandler = http.get(apiUrl('/plants/:id'), ({ params }) => {
+    const plant = plants.find((p) => p.id === params.id);
+    return plant ? HttpResponse.json(plant) : notFound('Plant');
+  });
+
+  const inspectionsHandler = http.get(apiUrl('/plants/:id/inspections'), ({ request, params }) => {
+    const search = new URL(request.url).searchParams;
+    const page = Number(search.get('page') ?? 1);
+    const pageSize = Number(search.get('pageSize') ?? 20);
+    const matches = inspections
+      .filter((i) => i.plantId === params.id)
+      .sort((a, b) => b.inspectedAt.localeCompare(a.inspectedAt));
+    return HttpResponse.json({
+      items: matches.slice((page - 1) * pageSize, page * pageSize),
+      page,
+      pageSize,
+      total: matches.length,
+      totalPages: Math.ceil(matches.length / pageSize),
+    });
+  });
+
+  const recordInspection = http.post(
+    apiUrl('/plants/:id/inspections'),
+    async ({ request, params }) => {
+      const raw: unknown = await request.json();
+      writes.push({ method: 'POST', path: `/plants/${String(params.id)}/inspections`, body: raw });
+      const plant = plants.find((p) => p.id === params.id);
+      if (!plant) return notFound('Plant');
+      if (plant.status === 'INACTIVE') {
+        return conflict('This plant is inactive, so it cannot be inspected', 'PLANT_INACTIVE');
+      }
+      const parsed = createInspectionBodySchema.safeParse(raw);
+      if (!parsed.success) return HttpResponse.json({ message: 'Invalid body' }, { status: 400 });
+
+      const passed = parsed.data.items.every((item) => item.passed);
+      const inspectedAt = new Date();
+      plant.status = passed ? 'ACTIVE' : 'REPAIR';
+      if (passed) {
+        const next = inspectedAt.getTime() + 30 * 24 * 60 * 60 * 1000;
+        plant.nextInspectionAt = new Date(next).toISOString();
+      }
+      created += 1;
+      const inspection: Inspection = {
+        id: `019a0000-0000-7000-8000-3000000010${String(created).padStart(2, '0')}`,
+        plantId: plant.id,
+        inspectorName: 'Ivy Inspector',
+        result: passed ? 'PASS' : 'FAIL',
+        notes: parsed.data.notes,
+        inspectedAt: inspectedAt.toISOString(),
+        items: parsed.data.items,
+      };
+      inspections = [...inspections, inspection];
+      return HttpResponse.json(inspection, { status: 201 });
+    },
+  );
 
   const sitesHandler = http.get(apiUrl('/sites'), () =>
     HttpResponse.json([...sites].sort((a, b) => a.name.localeCompare(b.name))),
@@ -248,6 +309,9 @@ export function dataHandlers(
     sites: sitesHandler,
     handlers: [
       plantsHandler,
+      plantHandler,
+      inspectionsHandler,
+      recordInspection,
       sitesHandler,
       createSite,
       updateSite,

@@ -1,4 +1,4 @@
-import type { ListPlantsQuery } from '@sitecheck/shared';
+import type { ListPlantsQuery, Plant } from '@sitecheck/shared';
 
 /**
  * Cache keys for plant data. Everything starts with 'plants', so a change
@@ -11,4 +11,7 @@ import type { ListPlantsQuery } from '@sitecheck/shared';
 export const plantKeys = {
   all: ['plants'] as const,
   list: (query: ListPlantsQuery) => ['plants', 'list', query] as const,
+  detail: (id: Plant['id']) => ['plants', 'detail', id] as const,
+  inspections: (id: Plant['id'], page: number) =>
+    ['plants', 'detail', id, 'inspections', page] as const,
 };

@@ -1,5 +1,6 @@
 import type { Plant } from '@sitecheck/shared';
 import type { ReactNode } from 'react';
+import { Link } from 'react-router';
 import { NextInspection } from './NextInspection';
 import { StatusBadge } from './StatusBadge';
 
@@ -48,7 +49,12 @@ export function PlantTable({ plants, stale, actions }: Props) {
           {plants.map((plant) => (
             <tr key={plant.id}>
               <th scope="row" className="px-4 py-3 font-normal">
-                <span className="block font-medium text-slate-900">{plant.name}</span>
+                <Link
+                  to={`/plants/${plant.id}`}
+                  className="block font-medium text-slate-900 underline decoration-slate-300 underline-offset-2 hover:decoration-slate-900"
+                >
+                  {plant.name}
+                </Link>
                 <span className="block text-slate-500">{plant.type}</span>
               </th>
               <td className="px-4 py-3 font-mono text-xs">{plant.serialNumber}</td>
