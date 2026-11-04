@@ -47,6 +47,9 @@ const optionalText = (max: number) =>
     .nullable()
     .default(null);
 
+export const inspectionCommentSchema = optionalText(500);
+export const inspectionNotesSchema = optionalText(2000);
+
 /**
  * No `result`, inspector or date: the server works those out, so a client cannot
  * pass a failed checklist off as a pass, sign for someone else or backdate it.
@@ -57,7 +60,7 @@ export const createInspectionBodySchema = z.object({
       z.object({
         label: z.enum(CHECKLIST_ITEMS),
         passed: z.boolean(),
-        comment: optionalText(500),
+        comment: inspectionCommentSchema,
       }),
     )
     .max(CHECKLIST_ITEMS.length)
@@ -77,7 +80,7 @@ export const createInspectionBodySchema = z.object({
         }
       });
     }),
-  notes: optionalText(2000),
+  notes: inspectionNotesSchema,
 });
 export type CreateInspectionBody = z.infer<typeof createInspectionBodySchema>;
 
