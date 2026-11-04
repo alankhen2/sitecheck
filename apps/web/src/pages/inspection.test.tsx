@@ -287,6 +287,9 @@ describe('the inspection form', () => {
     expect(screen.getByText('Repair')).toBeInTheDocument();
     expect((await screen.findAllByText(/Parking brake does not hold/)).length).toBeGreaterThan(0);
     expect(screen.getByText('Tagged out')).toBeInTheDocument();
+    const changes = await screen.findByRole('list', { name: 'Changes' });
+    expect(within(changes).getByText('Inspection recorded: failed')).toBeInTheDocument();
+    expect(within(changes).getByText('Status changed from Active to Repair')).toBeInTheDocument();
     expect(data.writes[0]?.body).toMatchObject({
       notes: 'Tagged out',
       items: expect.arrayContaining([

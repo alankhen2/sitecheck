@@ -1,8 +1,8 @@
 import type { Inspection, Plant } from '@sitecheck/shared';
-import { useSearchParams } from 'react-router';
 import { Pagination } from '../components/Pagination';
 import { formatDate } from '../lib/dates';
 import { userMessage } from '../lib/errors';
+import { usePageParam } from '../lib/usePageParam';
 import { useInspections } from './queries';
 
 /** Passed or failed, as a word in a pill (the word carries the meaning, not the colour). */
@@ -75,9 +75,7 @@ function InspectionCard({ inspection }: { inspection: Inspection }) {
 
 /** A plant's past inspections, with the page number in the URL. */
 export function InspectionHistory({ plantId }: { plantId: Plant['id'] }) {
-  const [params, setParams] = useSearchParams();
-  const asked = Number(params.get('page'));
-  const page = Number.isInteger(asked) && asked >= 1 ? asked : 1;
+  const [page, setPage] = usePageParam('page');
   const inspections = useInspections(plantId, page);
 
   return (
@@ -121,11 +119,10 @@ export function InspectionHistory({ plantId }: { plantId: Plant['id'] }) {
               ))}
             </ul>
             <Pagination
+              label="Inspection history pages"
               page={inspections.data.page}
               totalPages={inspections.data.totalPages}
-              onPageChange={(next) => {
-                setParams({ page: String(next) });
-              }}
+              onPageChange={setPage}
             />
           </>
         ) : (

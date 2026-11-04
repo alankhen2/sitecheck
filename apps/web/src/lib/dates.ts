@@ -11,6 +11,19 @@ export function formatDate(iso: string): string {
   return dateFormat.format(new Date(iso));
 }
 
+const dateTimeFormat = new Intl.DateTimeFormat('en-AU', {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+});
+
+/** "4 Nov 2026, 12:30 pm", in the browser's time zone. */
+export function formatDateTime(iso: string): string {
+  return dateTimeFormat.format(new Date(iso));
+}
+
 export type DueState = 'overdue' | 'soon' | 'later' | 'none';
 
 /**

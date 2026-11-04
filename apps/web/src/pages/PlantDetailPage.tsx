@@ -5,6 +5,7 @@ import { InspectionHistory } from '../inspections/InspectionHistory';
 import { formatDate } from '../lib/dates';
 import { userMessage } from '../lib/errors';
 import { usePageHeading } from '../lib/usePageHeading';
+import { ChangeHistory } from '../plants/ChangeHistory';
 import { statusLabel } from '../plants/labels';
 import { NextInspection } from '../plants/NextInspection';
 import { isPlantNotFound, usePlant } from '../plants/queries';
@@ -125,6 +126,7 @@ export function PlantDetailPage() {
           )}
 
           <InspectionHistory plantId={plant.data.id} />
+          <ChangeHistory plantId={plant.data.id} />
         </>
       )}
     </section>

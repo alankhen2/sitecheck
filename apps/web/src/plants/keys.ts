@@ -14,4 +14,5 @@ export const plantKeys = {
   detail: (id: Plant['id']) => ['plants', 'detail', id] as const,
   inspections: (id: Plant['id'], page: number) =>
     ['plants', 'detail', id, 'inspections', page] as const,
+  history: (id: Plant['id'], page: number) => ['plants', 'detail', id, 'history', page] as const,
 };

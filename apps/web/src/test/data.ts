@@ -1,5 +1,6 @@
 import {
   createInspectionBodySchema,
+  type AuditEntry,
   type CreatePlantBody,
   type CreateSiteBody,
   type ErrorCode,
@@ -99,10 +100,12 @@ export function dataHandlers(
   initialPlants: Plant[] = testPlants,
   initialSites: Site[] = testSites,
   initialInspections: Inspection[] = [],
+  initialAudit: AuditEntry[] = [],
 ) {
   let plants = initialPlants.map((plant) => ({ ...plant }));
   let sites = initialSites.map((site) => ({ ...site }));
   let inspections = [...initialInspections];
+  const audit = [...initialAudit];
   const requests: URL[] = [];
   const writes: WriteRequest[] = [];
   let created = 0;
@@ -170,6 +173,23 @@ export function dataHandlers(
     return plant ? HttpResponse.json(plant) : notFound('Plant');
   });
 
+  const historyHandler = http.get(apiUrl('/plants/:id/history'), ({ request, params }) => {
+    const search = new URL(request.url).searchParams;
+    const page = Number(search.get('page') ?? 1);
+    const pageSize = Number(search.get('pageSize') ?? 20);
+    const inspectionIds = inspections.filter((i) => i.plantId === params.id).map((i) => i.id);
+    const matches = audit.filter(
+      (entry) => entry.entityId === params.id || inspectionIds.includes(entry.entityId),
+    );
+    return HttpResponse.json({
+      items: matches.slice((page - 1) * pageSize, page * pageSize),
+      page,
+      pageSize,
+      total: matches.length,
+      totalPages: Math.ceil(matches.length / pageSize),
+    });
+  });
+
   const inspectionsHandler = http.get(apiUrl('/plants/:id/inspections'), ({ request, params }) => {
     const search = new URL(request.url).searchParams;
     const page = Number(search.get('page') ?? 1);
@@ -201,6 +221,7 @@ export function dataHandlers(
 
       const passed = parsed.data.items.every((item) => item.passed);
       const inspectedAt = new Date();
+      const statusBefore = plant.status;
       plant.status = passed ? 'ACTIVE' : 'REPAIR';
       if (passed) {
         const next = inspectedAt.getTime() + 30 * 24 * 60 * 60 * 1000;
@@ -217,6 +238,26 @@ export function dataHandlers(
         items: parsed.data.items,
       };
       inspections = [...inspections, inspection];
+      audit.unshift({
+        id: `019a0000-0000-7000-8000-5000000010${String(created).padStart(2, '0')}`,
+        entity: 'Inspection',
+        entityId: inspection.id,
+        action: 'CREATE',
+        actorName: 'Ivy Inspector',
+        changes: { result: { from: null, to: inspection.result } },
+        createdAt: inspection.inspectedAt,
+      });
+      if (statusBefore !== plant.status) {
+        audit.unshift({
+          id: `019a0000-0000-7000-8000-5000000020${String(created).padStart(2, '0')}`,
+          entity: 'Plant',
+          entityId: plant.id,
+          action: 'UPDATE',
+          actorName: 'Ivy Inspector',
+          changes: { status: { from: statusBefore, to: plant.status } },
+          createdAt: inspection.inspectedAt,
+        });
+      }
       return HttpResponse.json(inspection, { status: 201 });
     },
   );
@@ -310,6 +351,7 @@ export function dataHandlers(
     handlers: [
       plantsHandler,
       plantHandler,
+      historyHandler,
       inspectionsHandler,
       recordInspection,
       sitesHandler,
