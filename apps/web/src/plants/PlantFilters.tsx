@@ -8,8 +8,7 @@ interface Props {
   onChange: (changes: Partial<ListPlantsQuery>, options?: { replace?: boolean }) => void;
 }
 
-const select =
-  'min-w-0 flex-1 rounded border border-slate-300 bg-white px-3 py-2 focus:border-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-600/30 md:flex-none';
+const select = 'min-w-0 flex-1 rounded border border-slate-300 bg-white px-3 py-2 md:flex-none';
 // Full width on phones: a <select> is as wide as its longest site name otherwise.
 const selectLabel = 'flex w-full items-center gap-2 text-sm text-slate-700 md:w-auto';
 

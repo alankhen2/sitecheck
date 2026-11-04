@@ -55,7 +55,7 @@ export function SearchBox({ value, onSearch }: Props) {
         }}
         placeholder="Search name, type or serial number"
         maxLength={100}
-        className="w-full rounded border border-slate-300 bg-white px-3 py-2 focus:border-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-600/30"
+        className="w-full rounded border border-slate-300 bg-white px-3 py-2"
       />
     </div>
   );

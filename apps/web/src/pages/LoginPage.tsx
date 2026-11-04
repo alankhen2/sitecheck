@@ -68,7 +68,7 @@ export function LoginPage() {
             aria-invalid={errors.email ? true : undefined}
             aria-describedby={errors.email ? 'email-error' : undefined}
             {...register('email')}
-            className="mt-1 w-full rounded border border-slate-300 px-3 py-2 focus:border-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-600/30"
+            className="mt-1 w-full rounded border border-slate-300 px-3 py-2"
           />
           {errors.email && (
             <p id="email-error" className="mt-1 text-sm text-red-700">
@@ -88,7 +88,7 @@ export function LoginPage() {
             aria-invalid={errors.password ? true : undefined}
             aria-describedby={errors.password ? 'password-error' : undefined}
             {...register('password')}
-            className="mt-1 w-full rounded border border-slate-300 px-3 py-2 focus:border-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-600/30"
+            className="mt-1 w-full rounded border border-slate-300 px-3 py-2"
           />
           {errors.password && (
             <p id="password-error" className="mt-1 text-sm text-red-700">

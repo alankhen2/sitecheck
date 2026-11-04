@@ -69,8 +69,7 @@ const fieldErrors: Record<(typeof fieldNames)[number], string> = {
   nextInspectionAt: 'Enter a full date and time, or leave it empty.',
 };
 
-const inputClass =
-  'mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2 focus:border-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-600/30';
+const inputClass = 'mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2';
 
 interface Props {
   /** The plant to edit; leave out to add a new one. */

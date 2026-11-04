@@ -11,8 +11,7 @@ interface Props {
   onClose: () => void;
 }
 
-const inputClass =
-  'mt-1 w-full rounded border border-slate-300 px-3 py-2 focus:border-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-600/30';
+const inputClass = 'mt-1 w-full rounded border border-slate-300 px-3 py-2';
 
 /** Only the fields that differ from the saved site, so a PATCH sends what the user changed. */
 function changedFields(site: Site, values: CreateSiteBody): Partial<CreateSiteBody> {
