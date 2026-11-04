@@ -46,6 +46,7 @@ export const errorCodeSchema = z.enum([
   'SITE_INACTIVE',
   'SITE_HAS_PLANTS',
   'PLANT_HAS_INSPECTIONS',
+  'PLANT_INACTIVE',
 ]);
 export type ErrorCode = z.infer<typeof errorCodeSchema>;
 
