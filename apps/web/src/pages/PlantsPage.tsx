@@ -6,7 +6,7 @@ import { RowActions } from '../components/RowActions';
 import { userMessage } from '../lib/errors';
 import { useIsWideScreen } from '../lib/useMediaQuery';
 import { usePageHeading } from '../lib/usePageHeading';
-import { useUser } from '../auth/user-context';
+import { canEditPlants, useUser } from '../auth/user-context';
 import { DeletePlantDialog } from '../plants/DeletePlantDialog';
 import { PlantCards } from '../plants/PlantCards';
 import { PlantFilters } from '../plants/PlantFilters';
@@ -40,9 +40,10 @@ export function PlantsPage() {
   const [query, update] = usePlantQuery();
   const plants = usePlants(query);
   const filtered = hasFilters(query);
-  // Admins and inspectors (every role) may add and edit plants; only an admin
-  // may delete one. Hiding the button is for the user; the API enforces it.
-  const canDelete = useUser().role === 'ADMIN';
+  const currentUser = useUser();
+  const canEdit = canEditPlants(currentUser);
+  // Only an admin may delete a plant. Hiding the button is for the user; the API enforces it.
+  const canDelete = currentUser.role === 'ADMIN';
   const [dialog, setDialog] = useState<OpenDialog>(none);
   const closeDialog = () => {
     setDialog(none);
@@ -76,15 +77,17 @@ export function PlantsPage() {
         <h1 ref={heading} tabIndex={-1} className="text-2xl font-semibold outline-none">
           Plants
         </h1>
-        <button
-          type="button"
-          onClick={() => {
-            setDialog({ kind: 'add' });
-          }}
-          className="rounded bg-amber-700 px-4 py-2 font-medium text-white hover:bg-amber-800"
-        >
-          Add plant
-        </button>
+        {canEdit && (
+          <button
+            type="button"
+            onClick={() => {
+              setDialog({ kind: 'add' });
+            }}
+            className="rounded bg-amber-700 px-4 py-2 font-medium text-white hover:bg-amber-800"
+          >
+            Add plant
+          </button>
+        )}
       </div>
 
       <PlantFilters query={query} onChange={update} />
@@ -120,7 +123,7 @@ export function PlantsPage() {
             <PlantList
               plants={plants.data.items}
               stale={plants.isPlaceholderData}
-              actions={rowActions}
+              {...(canEdit && { actions: rowActions })}
             />
           ) : (
             <EmptyState

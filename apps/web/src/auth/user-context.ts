@@ -11,6 +11,15 @@ import { createContext, useContext } from 'react';
  */
 export const UserContext = createContext<PublicUser | null>(null);
 
+/**
+ * Whether this user may add, edit and inspect plants. Named roles rather than "not
+ * a viewer", so a role added later starts with nothing. Hiding controls is for the
+ * user's sake; the API enforces the same rule.
+ */
+export function canEditPlants({ role }: PublicUser): boolean {
+  return role === 'ADMIN' || role === 'INSPECTOR';
+}
+
 /** The logged-in user, in any component below RequireAuth. */
 export function useUser(): PublicUser {
   const user = useContext(UserContext);

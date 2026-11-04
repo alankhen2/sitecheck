@@ -1,4 +1,5 @@
 import { Link, useParams } from 'react-router';
+import { canEditPlants, useUser } from '../auth/user-context';
 import { InspectionForm } from '../inspections/InspectionForm';
 import { userMessage } from '../lib/errors';
 import { usePageHeading } from '../lib/usePageHeading';
@@ -14,6 +15,7 @@ export function InspectPage() {
       ? 'Plant not found'
       : 'Inspect plant';
   const heading = usePageHeading(title);
+  const canEdit = canEditPlants(useUser());
 
   return (
     <section className="mx-auto flex max-w-2xl flex-col gap-4">
@@ -63,7 +65,11 @@ export function InspectPage() {
       )}
 
       {plant.data &&
-        (plant.data.status === 'INACTIVE' ? (
+        (!canEdit ? (
+          <p role="alert" className="rounded bg-slate-100 px-3 py-2 text-slate-800">
+            This account can only view plants, so it cannot record an inspection.
+          </p>
+        ) : plant.data.status === 'INACTIVE' ? (
           <p role="alert" className="rounded bg-slate-100 px-3 py-2 text-slate-800">
             This plant is inactive, so it cannot be inspected.
           </p>

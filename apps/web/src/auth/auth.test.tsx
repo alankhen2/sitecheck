@@ -1,10 +1,10 @@
 import { plantPageSchema } from '@sitecheck/shared';
 import { screen, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiFetch } from '../lib/api';
 import { dataHandlers } from '../test/data';
-import { adminUser, authHandlers, inspectorUser } from '../test/fixtures';
+import { adminUser, authHandlers, inspectorUser, viewerUser } from '../test/fixtures';
 import { currentUrl, renderApp } from '../test/render';
 import { apiUrl, server } from '../test/server';
 
@@ -56,6 +56,64 @@ describe('protected pages', () => {
 
     await user.click(screen.getByRole('button', { name: 'Try again' }));
     expect(await screen.findByRole('heading', { name: 'Plants' })).toBeInTheDocument();
+  });
+});
+
+describe('demo login', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  const tryDemo = { name: 'Try the read-only demo' };
+
+  it('is not offered unless the build sets a demo account', async () => {
+    server.use(authHandlers.loggedOut());
+    renderApp('/');
+
+    await screen.findByRole('heading', { name: 'Log in to SiteCheck' });
+
+    expect(screen.queryByRole('button', tryDemo)).not.toBeInTheDocument();
+  });
+
+  it('logs in with one click, using the account from the build', async () => {
+    vi.stubEnv('VITE_DEMO_EMAIL', 'demo@sitecheck.dev');
+    vi.stubEnv('VITE_DEMO_PASSWORD', 'a public demo password');
+    const sent: unknown[] = [];
+    server.use(
+      authHandlers.loggedOut(),
+      http.post(apiUrl('/auth/login'), async ({ request }) => {
+        sent.push(await request.json());
+        return HttpResponse.json(viewerUser);
+      }),
+    );
+    const { user } = renderApp('/sites');
+
+    await user.click(await screen.findByRole('button', tryDemo));
+
+    expect(await screen.findByRole('heading', { name: 'Sites' })).toBeInTheDocument();
+    expect(sent).toEqual([{ email: 'demo@sitecheck.dev', password: 'a public demo password' }]);
+    expect(screen.getByText('Viewer (read-only)')).toBeInTheDocument();
+  });
+
+  it('shows why it failed and stays on the form', async () => {
+    vi.stubEnv('VITE_DEMO_EMAIL', 'demo@sitecheck.dev');
+    vi.stubEnv('VITE_DEMO_PASSWORD', 'a public demo password');
+    server.use(authHandlers.loggedOut(), authHandlers.loginFails());
+    const { user } = renderApp('/');
+
+    await user.click(await screen.findByRole('button', tryDemo));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Invalid email or password');
+  });
+
+  it('is not offered when only half of the account is set', async () => {
+    vi.stubEnv('VITE_DEMO_EMAIL', 'demo@sitecheck.dev');
+    server.use(authHandlers.loggedOut());
+    renderApp('/');
+
+    await screen.findByRole('heading', { name: 'Log in to SiteCheck' });
+
+    expect(screen.queryByRole('button', tryDemo)).not.toBeInTheDocument();
   });
 });
 

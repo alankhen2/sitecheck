@@ -16,6 +16,13 @@ export const inspectorUser: PublicUser = {
   role: 'INSPECTOR',
 };
 
+export const viewerUser: PublicUser = {
+  id: '019a0000-0000-7000-8000-0000000000ae',
+  name: 'Demo Viewer',
+  email: 'demo@sitecheck.dev',
+  role: 'VIEWER',
+};
+
 const unauthorized = () =>
   HttpResponse.json({ message: 'Authentication required' }, { status: 401 });
 

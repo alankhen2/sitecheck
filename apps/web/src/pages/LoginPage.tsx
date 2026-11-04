@@ -1,7 +1,8 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { loginBodySchema } from '@sitecheck/shared';
+import { loginBodySchema, type LoginBody } from '@sitecheck/shared';
 import { useForm } from 'react-hook-form';
 import { Navigate, useNavigate, useSearchParams } from 'react-router';
+import { demoAccount } from '../auth/demo-account';
 import { useCurrentUser, useLogin } from '../auth/queries';
 import { userMessage } from '../lib/errors';
 import { safeRedirect } from '../lib/redirect';
@@ -28,11 +29,13 @@ export function LoginPage() {
   // Already logged in (e.g. opened /login in a new tab): nothing to do here.
   if (user) return <Navigate to={target} replace />;
 
-  const onSubmit = handleSubmit((values) => {
-    login.mutate(values, {
+  const logIn = (account: LoginBody) => {
+    login.mutate(account, {
       onSuccess: () => void navigate(target, { replace: true }),
     });
-  });
+  };
+  const onSubmit = handleSubmit(logIn);
+  const demo = demoAccount();
 
   return (
     <main className="flex min-h-dvh items-center justify-center bg-slate-50 px-4">
@@ -104,6 +107,19 @@ export function LoginPage() {
         >
           {login.isPending ? 'Logging in…' : 'Log in'}
         </button>
+
+        {demo && (
+          <button
+            type="button"
+            disabled={login.isPending}
+            onClick={() => {
+              logIn(demo);
+            }}
+            className="mt-3 w-full rounded border border-slate-300 px-4 py-2 font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-60"
+          >
+            Try the read-only demo
+          </button>
+        )}
       </form>
     </main>
   );

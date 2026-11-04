@@ -1,6 +1,7 @@
 import { inspectionResultSchema, type Plant } from '@sitecheck/shared';
 import { Link, useLocation, useParams } from 'react-router';
 import { z } from 'zod';
+import { canEditPlants, useUser } from '../auth/user-context';
 import { InspectionHistory } from '../inspections/InspectionHistory';
 import { formatDate } from '../lib/dates';
 import { userMessage } from '../lib/errors';
@@ -39,6 +40,7 @@ export function PlantDetailPage() {
   const notFound = isPlantNotFound(plant.error);
   const heading = usePageHeading(plant.data?.name ?? (notFound ? 'Plant not found' : 'Plant'));
   const arrival = arrivalSchema.safeParse(useLocation().state);
+  const canEdit = canEditPlants(useUser());
 
   return (
     <section className="flex flex-col gap-6">
@@ -54,7 +56,7 @@ export function PlantDetailPage() {
           >
             {plant.data?.name ?? (notFound ? 'Plant not found' : 'Plant')}
           </h1>
-          {plant.data && plant.data.status !== 'INACTIVE' && (
+          {plant.data && plant.data.status !== 'INACTIVE' && canEdit && (
             <Link
               to={`/plants/${plant.data.id}/inspect`}
               className="rounded bg-amber-700 px-4 py-2 font-medium text-white hover:bg-amber-800"
