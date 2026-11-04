@@ -28,7 +28,7 @@ describe('integration setup', () => {
   });
 
   it('starts each test from the same data', async () => {
-    expect(await prisma.user.count()).toBe(2);
+    expect(await prisma.user.count()).toBe(3);
     expect(await prisma.site.count()).toBe(0);
   });
 

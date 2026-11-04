@@ -24,7 +24,11 @@ afterAll(async () => {
 });
 
 type Method = 'get' | 'post' | 'patch' | 'delete';
-type Who = 'anonymous' | 'inspector' | 'admin';
+type Role = 'viewer' | 'inspector' | 'admin';
+type Who = 'anonymous' | Role;
+
+/** Each role can do everything the one before it can. */
+const rank: Record<Role, number> = { viewer: 0, inspector: 1, admin: 2 };
 
 interface Ids {
   siteId: string;
@@ -37,15 +41,15 @@ interface Endpoint {
   path: (ids: Ids) => string;
   body?: (ids: Ids) => object;
   /** The lowest role allowed. */
-  allowed: 'inspector' | 'admin';
+  allowed: Role;
 }
 
 let serial = 0;
 const endpoints: Endpoint[] = [
-  { method: 'get', path: () => '/auth/me', allowed: 'inspector' },
-  { method: 'get', path: () => '/dashboard', allowed: 'inspector' },
-  { method: 'get', path: () => '/sites', allowed: 'inspector' },
-  { method: 'get', path: (ids) => `/sites/${ids.siteId}`, allowed: 'inspector' },
+  { method: 'get', path: () => '/auth/me', allowed: 'viewer' },
+  { method: 'get', path: () => '/dashboard', allowed: 'viewer' },
+  { method: 'get', path: () => '/sites', allowed: 'viewer' },
+  { method: 'get', path: (ids) => `/sites/${ids.siteId}`, allowed: 'viewer' },
   {
     method: 'post',
     path: () => '/sites',
@@ -59,8 +63,8 @@ const endpoints: Endpoint[] = [
     allowed: 'admin',
   },
   { method: 'delete', path: (ids) => `/sites/${ids.emptySiteId}`, allowed: 'admin' },
-  { method: 'get', path: () => '/plants', allowed: 'inspector' },
-  { method: 'get', path: (ids) => `/plants/${ids.plantId}`, allowed: 'inspector' },
+  { method: 'get', path: () => '/plants', allowed: 'viewer' },
+  { method: 'get', path: (ids) => `/plants/${ids.plantId}`, allowed: 'viewer' },
   {
     method: 'post',
     path: () => '/plants',
@@ -82,8 +86,8 @@ const endpoints: Endpoint[] = [
     allowed: 'inspector',
   },
   { method: 'delete', path: (ids) => `/plants/${ids.plantId}`, allowed: 'admin' },
-  { method: 'get', path: (ids) => `/plants/${ids.plantId}/inspections`, allowed: 'inspector' },
-  { method: 'get', path: (ids) => `/plants/${ids.plantId}/history`, allowed: 'inspector' },
+  { method: 'get', path: (ids) => `/plants/${ids.plantId}/inspections`, allowed: 'viewer' },
+  { method: 'get', path: (ids) => `/plants/${ids.plantId}/history`, allowed: 'viewer' },
   {
     method: 'post',
     path: (ids) => `/plants/${ids.plantId}/inspections`,
@@ -95,12 +99,11 @@ const endpoints: Endpoint[] = [
 /** What each caller should get: 401 without a session, 403 below the allowed role. */
 function expectedStatus(endpoint: Endpoint, who: Who): 'ok' | 401 | 403 {
   if (who === 'anonymous') return 401;
-  if (endpoint.allowed === 'admin' && who === 'inspector') return 403;
-  return 'ok';
+  return rank[who] < rank[endpoint.allowed] ? 403 : 'ok';
 }
 
 const cases = endpoints.flatMap((endpoint) =>
-  (['anonymous', 'inspector', 'admin'] as const).map((who) => ({
+  (['anonymous', 'viewer', 'inspector', 'admin'] as const).map((who) => ({
     name: `${endpoint.method.toUpperCase()} ${endpoint.path({ siteId: ':id', emptySiteId: ':id', plantId: ':id' })} as ${who}`,
     endpoint,
     who,
@@ -133,6 +136,15 @@ describe('access matrix', () => {
     } else {
       expect(res.status).toBe(expected);
     }
+  });
+
+  // The promise made to the demo account. A write allowed to viewers by mistake
+  // in the table above would fail here instead of quietly passing.
+  it('lets a viewer only read', () => {
+    const allowedToViewers = endpoints.filter((e) => e.allowed === 'viewer');
+
+    expect(allowedToViewers.map((e) => e.method)).toEqual(allowedToViewers.map(() => 'get'));
+    expect(allowedToViewers.length).toBeGreaterThan(0);
   });
 
   it('covers every route the app registers', () => {

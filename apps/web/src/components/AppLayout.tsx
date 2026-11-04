@@ -10,7 +10,11 @@ const links = [
   { to: '/sites', label: 'Sites' },
 ];
 
-const roleLabel = { ADMIN: 'Admin', INSPECTOR: 'Inspector' } as const;
+const roleLabel = {
+  ADMIN: 'Admin',
+  INSPECTOR: 'Inspector',
+  VIEWER: 'Viewer (read-only)',
+} as const;
 
 /** The frame around every logged-in page (rendered inside RequireAuth). */
 export function AppLayout() {

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /** Mirrors the Prisma `Role` enum; the api typechecks that the two stay in sync. */
-export const roleSchema = z.enum(['ADMIN', 'INSPECTOR']);
+export const roleSchema = z.enum(['ADMIN', 'INSPECTOR', 'VIEWER']);
 export type Role = z.infer<typeof roleSchema>;
 
 // Normalise before validating, so "  Ivy@Example.com " and "ivy@example.com"

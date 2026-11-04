@@ -1,5 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
-import { E2E_PASSWORD } from './tests/test-data';
+import { E2E_DEMO_PASSWORD, E2E_PASSWORD } from './tests/test-data';
 
 // Not the dev ports: a dev server left running must not be mistaken for the test
 // one, because these tests write to whatever database that server uses.
@@ -40,6 +40,7 @@ export default defineConfig({
         DATABASE_URL: databaseUrl,
         JWT_SECRET: 'e2e-only-secret-that-signs-nothing-real',
         SEED_PASSWORD: E2E_PASSWORD,
+        DEMO_PASSWORD: E2E_DEMO_PASSWORD,
       },
     },
     {

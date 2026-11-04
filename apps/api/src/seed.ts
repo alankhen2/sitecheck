@@ -1,5 +1,5 @@
 /**
- * Demo data: 2 users, 3 sites, 15 plants, 7 inspections.
+ * Demo data: 3 users, 3 sites, 15 plants, 7 inspections.
  * Idempotent: rows are upserted by a stable key (email, fixed id, serial
  * number), so running it again resets the demo values without duplicating or
  * deleting anything else.
@@ -9,6 +9,7 @@
 import { CHECKLIST_ITEMS } from '@sitecheck/shared';
 import { prisma } from './db.js';
 import { hashPassword } from './lib/password.js';
+import { seedPasswords } from './lib/seed-passwords.js';
 import type { PlantStatus, Role } from './generated/prisma/client.js';
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -18,6 +19,7 @@ const inDays = (days: number) => new Date(Date.now() + days * DAY);
 const users: { name: string; email: string; role: Role }[] = [
   { name: 'Alex Admin', email: 'admin@sitecheck.dev', role: 'ADMIN' },
   { name: 'Ivy Inspector', email: 'inspector@sitecheck.dev', role: 'INSPECTOR' },
+  { name: 'Demo Viewer', email: 'demo@sitecheck.dev', role: 'VIEWER' },
 ];
 
 const sites = [
@@ -238,16 +240,14 @@ const inspections: {
 ];
 
 async function main() {
-  // Dev-only default. Production seeding must set SEED_PASSWORD explicitly.
-  const password = process.env.SEED_PASSWORD ?? 'sitecheck-dev';
-  if (process.env.NODE_ENV === 'production' && !process.env.SEED_PASSWORD) {
-    throw new Error('Set SEED_PASSWORD when seeding in production.');
-  }
+  const passwords = seedPasswords(process.env);
 
   for (const user of users) {
     // Hash per user: each gets its own random salt, so equal passwords
     // never produce equal hashes in the database.
-    const passwordHash = await hashPassword(password);
+    const passwordHash = await hashPassword(
+      user.role === 'VIEWER' ? passwords.demo : passwords.staff,
+    );
     await prisma.user.upsert({
       where: { email: user.email },
       create: { ...user, passwordHash },

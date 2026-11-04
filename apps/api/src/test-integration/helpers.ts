@@ -54,10 +54,11 @@ function fastHash(password: string): string {
 export const users = {
   admin: { name: 'Alex Admin', email: 'admin@test.dev', password: 'admin password 123' },
   inspector: { name: 'Ivy Inspector', email: 'ivy@test.dev', password: 'inspector password 1' },
+  viewer: { name: 'Vic Viewer', email: 'vic@test.dev', password: 'viewer password 12' },
 } as const;
 
 export async function seedUsers() {
-  const [admin, inspector] = await Promise.all([
+  const [admin, inspector, viewer] = await Promise.all([
     prisma.user.create({
       data: { ...pick(users.admin), role: 'ADMIN', passwordHash: fastHash(users.admin.password) },
     }),
@@ -68,8 +69,15 @@ export async function seedUsers() {
         passwordHash: fastHash(users.inspector.password),
       },
     }),
+    prisma.user.create({
+      data: {
+        ...pick(users.viewer),
+        role: 'VIEWER',
+        passwordHash: fastHash(users.viewer.password),
+      },
+    }),
   ]);
-  return { admin, inspector };
+  return { admin, inspector, viewer };
 }
 
 const pick = ({ name, email }: { name: string; email: string }) => ({ name, email });
