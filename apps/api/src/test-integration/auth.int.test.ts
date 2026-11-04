@@ -2,7 +2,7 @@ import supertest from 'supertest';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { agentFor, prisma, resetDatabase, seedUsers, startApp, users } from './helpers.js';
 
-const { app, http } = await startApp();
+const { app, http } = await startApp({ ALLOW_REGISTRATION: true });
 
 beforeEach(async () => {
   await resetDatabase();

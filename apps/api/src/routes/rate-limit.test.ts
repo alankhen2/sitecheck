@@ -192,7 +192,9 @@ describe('the address behind a proxy', () => {
 
 describe('registering', () => {
   it('allows 10 accounts an hour from one address', async () => {
-    const { app } = await buildTestApp();
+    const { app } = await buildTestApp({
+      config: { ...testConfig, ALLOW_REGISTRATION: true },
+    });
     const register = (i: number) =>
       app.inject({
         method: 'POST',

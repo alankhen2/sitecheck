@@ -11,6 +11,8 @@ const envSchema = z.object({
   // How many proxies sit in front of the app. 0 ignores X-Forwarded-For, which a
   // client could otherwise fill in to get a fresh rate limit on every request.
   TRUST_PROXY: z.coerce.number().int().min(0).default(0),
+  // Off unless asked for: anyone who can register gets an inspector's write access.
+  ALLOW_REGISTRATION: z.stringbool().default(false),
 });
 
 export type Config = z.infer<typeof envSchema>;

@@ -6,7 +6,7 @@ import type { ErrorCode, ErrorResponse } from '@sitecheck/shared';
  * with that status, so route handlers do not need their own try/catch.
  */
 export abstract class DomainError extends Error {
-  abstract readonly statusCode: 400 | 404 | 409 | 429;
+  abstract readonly statusCode: 400 | 403 | 404 | 409 | 429;
   /** Set when a client may need to tell this error apart from others with the same status. */
   readonly code?: ErrorCode;
 }
@@ -38,6 +38,15 @@ export class InvalidReferenceError extends DomainError {
   constructor(message: string) {
     super(message);
     this.name = 'InvalidReferenceError';
+  }
+}
+
+/** This server does not take new accounts (see ALLOW_REGISTRATION). */
+export class RegistrationClosedError extends DomainError {
+  readonly statusCode = 403;
+  constructor() {
+    super('Registration is closed');
+    this.name = 'RegistrationClosedError';
   }
 }
 

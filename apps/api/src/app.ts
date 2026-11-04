@@ -81,7 +81,11 @@ export async function buildApp({
   });
 
   await app.register(authPlugin, { config, auth });
-  await app.register(authRoutes, { auth, limits: authLimits });
+  await app.register(authRoutes, {
+    auth,
+    limits: authLimits,
+    allowRegistration: config.ALLOW_REGISTRATION,
+  });
   await app.register(siteRoutes, { sites });
   await app.register(plantRoutes, { plants });
   await app.register(inspectionRoutes, { inspections });

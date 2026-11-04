@@ -11,22 +11,33 @@ import {
   InvalidCredentialsError,
   type AuthService,
 } from '../services/auth.service.js';
+import { RegistrationClosedError } from '../services/errors.js';
 
 // Route handlers only translate HTTP <-> service calls; the rules live in the service.
 // `schema.body` validates the request, `schema.response` strips any field not in the schema.
-export const authRoutes: FastifyPluginAsyncZod<{ auth: AuthService; limits: AuthLimits }> = async (
-  app,
-  { auth, limits },
-) => {
+export const authRoutes: FastifyPluginAsyncZod<{
+  auth: AuthService;
+  limits: AuthLimits;
+  allowRegistration: boolean;
+}> = async (app, { auth, limits, allowRegistration }) => {
   const limit = createAuthLimitHooks(limits);
+
+  const refuseWhenClosed = (): Promise<void> =>
+    allowRegistration ? Promise.resolve() : Promise.reject(new RegistrationClosedError());
 
   app.post(
     '/auth/register',
     {
-      onRequest: limit.registerPerAddress,
+      // First of all: a closed door needs no counting and no reading of the body.
+      onRequest: [refuseWhenClosed, limit.registerPerAddress],
       schema: {
         body: registerBodySchema,
-        response: { 201: publicUserSchema, 409: errorResponseSchema, 429: errorResponseSchema },
+        response: {
+          201: publicUserSchema,
+          403: errorResponseSchema,
+          409: errorResponseSchema,
+          429: errorResponseSchema,
+        },
       },
     },
     async (request, reply) => {

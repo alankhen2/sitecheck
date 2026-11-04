@@ -1,7 +1,7 @@
 import { randomBytes, scryptSync } from 'node:crypto';
 import supertest from 'supertest';
 import { buildApp } from '../app.js';
-import { loadConfig } from '../config.js';
+import { loadConfig, type Config } from '../config.js';
 import { prisma } from '../db.js';
 import { createServices } from '../services/index.js';
 import { assertTestDatabase } from './database-url.js';
@@ -9,9 +9,9 @@ import { assertTestDatabase } from './database-url.js';
 export { prisma };
 
 /** The production app (real services, real Prisma) on the test database. */
-export async function startApp() {
+export async function startApp(config: Partial<Config> = {}) {
   const app = await buildApp({
-    config: loadConfig(),
+    config: { ...loadConfig(), ...config },
     ...createServices(prisma),
     // Tests log in over and over from one address. rate-limit.int.test.ts uses the real limits.
     authLimits: {

@@ -8,7 +8,10 @@ import { testUsers } from '../test-utils/fakes.js';
 
 /** The full app plus test-only routes that exercise the guards directly. */
 async function setup(users: UserRecord[] = [testUsers.admin, testUsers.inspector]) {
-  const built = await buildTestApp({ users });
+  const built = await buildTestApp({
+    users,
+    config: { ...testConfig, ALLOW_REGISTRATION: true },
+  });
   const { app } = built;
 
   app.get('/test/any-user', { onRequest: app.authenticate }, (req) => ({ id: req.user.id }));
@@ -85,6 +88,41 @@ describe('POST /auth/register', () => {
     });
 
     expect(res.statusCode).toBe(409);
+  });
+
+  describe('when registration is closed', () => {
+    const newPerson = {
+      name: 'New Person',
+      email: 'new@sitecheck.dev',
+      password: 'a long enough password',
+    };
+
+    it('refuses with 403, creates nobody and starts no session', async () => {
+      const { app, users } = await buildTestApp({ users: [] });
+
+      const res = await app.inject({ method: 'POST', url: '/auth/register', payload: newPerson });
+
+      expect(res.statusCode).toBe(403);
+      expect(res.json()).toEqual({ message: 'Registration is closed' });
+      expect(res.cookies).toHaveLength(0);
+      expect(users.rows).toHaveLength(0);
+    });
+
+    it('refuses before reading the body', async () => {
+      const { app } = await buildTestApp({ users: [] });
+
+      const res = await app.inject({ method: 'POST', url: '/auth/register', payload: {} });
+
+      expect(res.statusCode).toBe(403);
+    });
+
+    it('still lets existing users log in', async () => {
+      const { app } = await buildTestApp();
+
+      const token = await loginWith(app, testUsers.admin.email, 'admin password 123');
+
+      expect(token).toBeTruthy();
+    });
   });
 });
 
