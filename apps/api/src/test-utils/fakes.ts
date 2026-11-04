@@ -7,6 +7,11 @@ import {
 } from '../services/auth.service.js';
 import { InvalidReferenceError, NotFoundError } from '../services/errors.js';
 import {
+  PlantInactiveError,
+  type InspectionRecord,
+  type InspectionRepository,
+} from '../services/inspections.service.js';
+import {
   PlantHasInspectionsError,
   SerialNumberTakenError,
   type PlantRecord,
@@ -211,6 +216,47 @@ export function fakePlants(
       rows.splice(index, 1);
       bump(plant.siteId, -1);
       return Promise.resolve();
+    },
+  };
+}
+
+/**
+ * In-memory InspectionRepository on top of the fake plant store. `inspectionCounts`
+ * is the same object fakePlants reads, so a recorded inspection blocks deleting the plant.
+ */
+export function fakeInspections(
+  plants: { rows: PlantRecord[] },
+  users: UserRecord[],
+  inspectionCounts: Record<string, number> = {},
+): InspectionRepository & { rows: InspectionRecord[] } {
+  const rows: InspectionRecord[] = [];
+  return {
+    rows,
+    record: ({ plantId, inspectorId, result, notes, inspectedAt, items, plantChanges }) => {
+      const plant = plants.rows.find((p) => p.id === plantId);
+      if (!plant) return Promise.reject(new NotFoundError('Plant'));
+      if (plant.status === 'INACTIVE') return Promise.reject(new PlantInactiveError());
+      Object.assign(plant, plantChanges, { updatedAt: new Date() });
+      inspectionCounts[plantId] = (inspectionCounts[plantId] ?? 0) + 1;
+      const inspection: InspectionRecord = {
+        id: randomUUID(),
+        plantId,
+        inspectorName: users.find((u) => u.id === inspectorId)?.name ?? 'Unknown',
+        result,
+        notes,
+        inspectedAt,
+        items: [...items]
+          .sort((a, b) => a.position - b.position)
+          .map(({ label, passed, comment }) => ({ label, passed, comment })),
+      };
+      rows.push(inspection);
+      return Promise.resolve(inspection);
+    },
+    listForPlant: (plantId, { skip, take }) => {
+      const matches = rows
+        .filter((i) => i.plantId === plantId)
+        .sort((a, b) => b.inspectedAt.getTime() - a.inspectedAt.getTime());
+      return Promise.resolve({ rows: matches.slice(skip, skip + take), total: matches.length });
     },
   };
 }

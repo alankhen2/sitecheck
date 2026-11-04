@@ -109,7 +109,7 @@ export function createPlant(
   });
 }
 
-/** Records an inspection directly; the inspection API arrives in phase 4. */
+/** Inserts an inspection directly, for arranging test data. It has no effect on the plant. */
 export function createInspection(plantId: string, inspectorId: string) {
   return prisma.inspection.create({ data: { plantId, inspectorId, result: 'PASS' } });
 }

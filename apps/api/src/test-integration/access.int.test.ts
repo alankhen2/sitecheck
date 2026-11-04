@@ -1,3 +1,4 @@
+import { CHECKLIST_ITEMS } from '@sitecheck/shared';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   agentFor,
@@ -80,6 +81,13 @@ const endpoints: Endpoint[] = [
     allowed: 'inspector',
   },
   { method: 'delete', path: (ids) => `/plants/${ids.plantId}`, allowed: 'admin' },
+  { method: 'get', path: (ids) => `/plants/${ids.plantId}/inspections`, allowed: 'inspector' },
+  {
+    method: 'post',
+    path: (ids) => `/plants/${ids.plantId}/inspections`,
+    body: () => ({ items: CHECKLIST_ITEMS.map((label) => ({ label, passed: true })) }),
+    allowed: 'inspector',
+  },
 ];
 
 /** What each caller should get: 401 without a session, 403 below the allowed role. */

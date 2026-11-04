@@ -1,9 +1,11 @@
 import type { PrismaClient } from '../generated/prisma/client.js';
 import { hashPassword, verifyPassword } from '../lib/password.js';
+import { createInspectionRepository } from '../repositories/inspections.js';
 import { createPlantRepository } from '../repositories/plants.js';
 import { createSiteRepository } from '../repositories/sites.js';
 import { createUserRepository } from '../repositories/users.js';
 import { createAuthService } from './auth.service.js';
+import { createInspectionService } from './inspections.service.js';
 import { createPlantService } from './plants.service.js';
 import { createSiteService } from './sites.service.js';
 
@@ -14,6 +16,7 @@ import { createSiteService } from './sites.service.js';
  */
 export function createServices(prisma: PrismaClient) {
   const siteRepository = createSiteRepository(prisma);
+  const plantRepository = createPlantRepository(prisma);
   return {
     auth: createAuthService({
       users: createUserRepository(prisma),
@@ -21,9 +24,10 @@ export function createServices(prisma: PrismaClient) {
       verifyPassword,
     }),
     sites: createSiteService({ sites: siteRepository }),
-    plants: createPlantService({
-      plants: createPlantRepository(prisma),
-      sites: siteRepository,
+    plants: createPlantService({ plants: plantRepository, sites: siteRepository }),
+    inspections: createInspectionService({
+      inspections: createInspectionRepository(prisma),
+      plants: plantRepository,
     }),
   };
 }
