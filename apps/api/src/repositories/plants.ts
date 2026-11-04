@@ -7,6 +7,7 @@ import type {
 import { escapeLike } from '../lib/like.js';
 import { isPrismaError, PrismaCode } from '../lib/prisma-errors.js';
 import type { Assert, Same } from '../lib/types.js';
+import { changesBetween, plantSnapshot } from '../services/audit.service.js';
 import { InvalidReferenceError, NotFoundError } from '../services/errors.js';
 import {
   PlantHasInspectionsError,
@@ -14,6 +15,7 @@ import {
   type PlantRecord,
   type PlantRepository,
 } from '../services/plants.service.js';
+import { writeAuditEntry } from './audit.js';
 
 // Fails typecheck if the shared Zod enum and the Prisma enum drift apart.
 export type PlantStatusesMatch = Assert<Same<PlantStatus, DbPlantStatus>>;
@@ -35,6 +37,44 @@ const select = {
 type Row = Prisma.PlantGetPayload<{ select: typeof select }>;
 
 const toRecord = ({ site, ...plant }: Row): PlantRecord => ({ ...plant, siteName: site.name });
+
+/**
+ * Locks the plant's row until the transaction ends, then reads it. What is read
+ * stays true while the transaction decides and writes: a second change waits
+ * here, so an audit entry's "from" value is always what the plant really held.
+ * Prisma has no API for FOR UPDATE, and the id is a bound parameter here too.
+ */
+export async function lockPlant(
+  tx: Prisma.TransactionClient,
+  id: string,
+): Promise<PlantRecord | null> {
+  await tx.$queryRaw`SELECT 1 FROM plants WHERE id = ${id}::uuid FOR UPDATE`;
+  const row = await tx.plant.findUnique({ where: { id }, select });
+  return row ? toRecord(row) : null;
+}
+
+/** Saves `changes` and, if they changed anything, the audit entry. Needs the lock and `before`. */
+export async function updateLockedPlant(
+  tx: Prisma.TransactionClient,
+  before: PlantRecord,
+  changes: Prisma.PlantUncheckedUpdateInput,
+  actorId: string,
+): Promise<PlantRecord> {
+  const after = toRecord(
+    await tx.plant.update({ where: { id: before.id }, data: changes, select }),
+  );
+  const auditChanges = changesBetween(plantSnapshot(before), plantSnapshot(after));
+  if (Object.keys(auditChanges).length > 0) {
+    await writeAuditEntry(tx, {
+      userId: actorId,
+      entity: 'Plant',
+      entityId: before.id,
+      action: 'UPDATE',
+      changes: auditChanges,
+    });
+  }
+  return after;
+}
 
 /** Translates constraint errors from a write into the service's domain errors. */
 function mapWriteError(err: unknown): never {
@@ -96,35 +136,59 @@ export function createPlantRepository(prisma: PrismaClient): PlantRepository {
       return prisma.inspection.count({ where: { plantId: id } });
     },
 
-    async create({ siteId, name, type, serialNumber, status, nextInspectionAt }) {
+    async create({ siteId, name, type, serialNumber, status, nextInspectionAt }, actorId) {
       // Columns listed explicitly: TypeScript lets an object with extra
       // properties (e.g. a whole PlantRecord) through, and Prisma rejects unknown fields.
       const data = { siteId, name, type, serialNumber, status, nextInspectionAt };
       try {
-        return toRecord(await prisma.plant.create({ data, select }));
+        return await prisma.$transaction(async (tx) => {
+          const plant = toRecord(await tx.plant.create({ data, select }));
+          await writeAuditEntry(tx, {
+            userId: actorId,
+            entity: 'Plant',
+            entityId: plant.id,
+            action: 'CREATE',
+            changes: changesBetween(null, plantSnapshot(plant)),
+          });
+          return plant;
+        });
       } catch (err) {
         mapWriteError(err);
       }
     },
 
-    async update(id, changes) {
+    async update(id, changes, actorId) {
       try {
-        return toRecord(await prisma.plant.update({ where: { id }, data: changes, select }));
+        return await prisma.$transaction(async (tx) => {
+          const before = await lockPlant(tx, id);
+          if (!before) throw new NotFoundError('Plant');
+          return updateLockedPlant(tx, before, changes, actorId);
+        });
       } catch (err) {
         mapWriteError(err);
       }
     },
 
-    async delete(id) {
-      // One statement: DELETE ... WHERE id = $1 AND NOT EXISTS (inspections).
-      // A plain delete would cascade to inspections saved after the service's check.
-      const { count } = await prisma.plant.deleteMany({
-        where: { id, inspections: { none: {} } },
-      });
-      if (count === 1) return;
+    async delete(id, actorId) {
+      await prisma.$transaction(async (tx) => {
+        const before = await lockPlant(tx, id);
+        if (!before) throw new NotFoundError('Plant');
 
-      const stillThere = await prisma.plant.findUnique({ where: { id }, select: { id: true } });
-      throw stillThere ? new PlantHasInspectionsError() : new NotFoundError('Plant');
+        // One statement: DELETE ... WHERE id = $1 AND NOT EXISTS (inspections).
+        // A plain delete would cascade to inspections saved after the service's check.
+        const { count } = await tx.plant.deleteMany({
+          where: { id, inspections: { none: {} } },
+        });
+        if (count === 0) throw new PlantHasInspectionsError();
+
+        await writeAuditEntry(tx, {
+          userId: actorId,
+          entity: 'Plant',
+          entityId: id,
+          action: 'DELETE',
+          changes: changesBetween(plantSnapshot(before), null),
+        });
+      });
     },
   };
 }

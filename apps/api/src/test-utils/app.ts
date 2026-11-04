@@ -1,11 +1,13 @@
 import { buildApp } from '../app.js';
 import { loadConfig, type Config } from '../config.js';
 import { SESSION_COOKIE } from '../plugins/auth.js';
+import { createAuditService } from '../services/audit.service.js';
 import { createAuthService, type UserRecord } from '../services/auth.service.js';
 import { createInspectionService } from '../services/inspections.service.js';
 import { createPlantService, type PlantRecord } from '../services/plants.service.js';
 import { createSiteService, type SiteRecord } from '../services/sites.service.js';
 import {
+  fakeAudit,
   fakeHashPassword,
   fakeInspections,
   fakePlants,
@@ -41,8 +43,9 @@ export async function buildTestApp(seed: Seed = {}) {
   const sites = fakeSites(seed.sites ?? []);
   // One object: recording an inspection is what later blocks deleting the plant.
   const inspectionCounts = { ...seed.inspectionCounts };
-  const plants = fakePlants(sites, seed.plants ?? [], inspectionCounts);
-  const inspections = fakeInspections(plants, users.rows, inspectionCounts);
+  const audit = fakeAudit(users.rows);
+  const plants = fakePlants(sites, seed.plants ?? [], inspectionCounts, audit);
+  const inspections = fakeInspections(plants, users.rows, inspectionCounts, audit);
   const app = await buildApp({
     config: seed.config ?? testConfig,
     auth: createAuthService({
@@ -53,8 +56,9 @@ export async function buildTestApp(seed: Seed = {}) {
     sites: createSiteService({ sites }),
     plants: createPlantService({ plants, sites }),
     inspections: createInspectionService({ inspections, plants }),
+    audit: createAuditService({ audit, plants }),
   });
-  return { app, users, sites, plants, inspections };
+  return { app, users, sites, plants, inspections, audit };
 }
 
 export type TestApp = Awaited<ReturnType<typeof buildTestApp>>['app'];

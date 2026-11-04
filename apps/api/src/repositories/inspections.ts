@@ -5,12 +5,15 @@ import type {
   PrismaClient,
 } from '../generated/prisma/client.js';
 import type { Assert, Same } from '../lib/types.js';
+import { changesBetween, inspectionSnapshot } from '../services/audit.service.js';
 import { NotFoundError } from '../services/errors.js';
 import {
   PlantInactiveError,
   type InspectionRecord,
   type InspectionRepository,
 } from '../services/inspections.service.js';
+import { writeAuditEntry } from './audit.js';
+import { lockPlant, updateLockedPlant } from './plants.js';
 
 // Fails typecheck if the shared Zod enum and the Prisma enum drift apart.
 export type InspectionResultsMatch = Assert<Same<InspectionResult, DbInspectionResult>>;
@@ -39,23 +42,15 @@ export function createInspectionRepository(prisma: PrismaClient): InspectionRepo
   return {
     async record({ plantId, inspectorId, result, notes, inspectedAt, items, plantChanges }) {
       const row = await prisma.$transaction(async (tx) => {
-        // The plant first, with its condition in the same statement: this also
-        // locks the row, so it cannot be deleted or marked inactive half way, and
-        // a plant marked inactive since the service's check is not reactivated.
-        const { count } = await tx.plant.updateMany({
-          where: { id: plantId, status: { not: 'INACTIVE' } },
-          data: plantChanges,
-        });
-        if (count === 0) {
-          const stillThere = await tx.plant.findUnique({
-            where: { id: plantId },
-            select: { id: true },
-          });
-          // Throwing rolls the transaction back.
-          throw stillThere ? new PlantInactiveError() : new NotFoundError('Plant');
-        }
+        // The plant first, under a lock, so it cannot be deleted or marked inactive
+        // half way, and one marked inactive since the service's check is not
+        // reactivated. Throwing rolls the transaction back.
+        const plant = await lockPlant(tx, plantId);
+        if (!plant) throw new NotFoundError('Plant');
+        if (plant.status === 'INACTIVE') throw new PlantInactiveError();
+        await updateLockedPlant(tx, plant, plantChanges, inspectorId);
 
-        return tx.inspection.create({
+        const inspection = await tx.inspection.create({
           data: {
             plantId,
             inspectorId,
@@ -73,6 +68,14 @@ export function createInspectionRepository(prisma: PrismaClient): InspectionRepo
           },
           select,
         });
+        await writeAuditEntry(tx, {
+          userId: inspectorId,
+          entity: 'Inspection',
+          entityId: inspection.id,
+          action: 'CREATE',
+          changes: changesBetween(null, inspectionSnapshot(result)),
+        });
+        return inspection;
       });
       return toRecord(row);
     },

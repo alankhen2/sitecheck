@@ -1,10 +1,18 @@
 import type { ListPlantsQuery, PlantStatus } from '@sitecheck/shared';
 import { describe, expect, it } from 'vitest';
-import { fakePlants, fakeSites, plantAt, testPlants, testSites } from '../test-utils/fakes.js';
+import {
+  fakePlants,
+  fakeSites,
+  plantAt,
+  testPlants,
+  testSites,
+  testUsers,
+} from '../test-utils/fakes.js';
 import { ConflictError, InvalidReferenceError, NotFoundError } from './errors.js';
 import { createPlantService } from './plants.service.js';
 
 const missingId = '019a0000-0000-7000-8000-00000000ffff';
+const actor = testUsers.admin.id;
 
 /** Quarry with an excavator (3 inspections) and a loader (none), plus two empty sites. */
 function setup() {
@@ -174,7 +182,7 @@ describe('create', () => {
   it('creates a plant at an active site', async () => {
     const { service, sites } = setup();
 
-    const plant = await service.create(newPlant);
+    const plant = await service.create(newPlant, actor);
 
     expect(plant).toMatchObject({ ...newPlant, siteName: 'Empty Yard' });
     expect(sites.rows.find((s) => s.id === testSites.emptyYard.id)?.plantCount).toBe(1);
@@ -183,7 +191,7 @@ describe('create', () => {
   it('rejects a site that does not exist', async () => {
     const { service } = setup();
 
-    await expect(service.create({ ...newPlant, siteId: missingId })).rejects.toBeInstanceOf(
+    await expect(service.create({ ...newPlant, siteId: missingId }, actor)).rejects.toBeInstanceOf(
       InvalidReferenceError,
     );
   });
@@ -191,16 +199,16 @@ describe('create', () => {
   it('rejects an inactive site', async () => {
     const { service } = setup();
 
-    await expect(service.create({ ...newPlant, siteId: testSites.closedYard.id })).rejects.toThrow(
-      'inactive site',
-    );
+    await expect(
+      service.create({ ...newPlant, siteId: testSites.closedYard.id }, actor),
+    ).rejects.toThrow('inactive site');
   });
 
   it('rejects a serial number that is already used', async () => {
     const { service } = setup();
 
     await expect(
-      service.create({ ...newPlant, serialNumber: testPlants.loader.serialNumber }),
+      service.create({ ...newPlant, serialNumber: testPlants.loader.serialNumber }, actor),
     ).rejects.toBeInstanceOf(ConflictError);
   });
 });
@@ -209,7 +217,7 @@ describe('update', () => {
   it('changes only the fields given', async () => {
     const { service } = setup();
 
-    const plant = await service.update(testPlants.excavator.id, { status: 'REPAIR' });
+    const plant = await service.update(testPlants.excavator.id, { status: 'REPAIR' }, actor);
 
     expect(plant).toMatchObject({ status: 'REPAIR', name: testPlants.excavator.name });
   });
@@ -217,7 +225,7 @@ describe('update', () => {
   it('clears the next inspection date when sent null', async () => {
     const { service } = setup();
 
-    const plant = await service.update(testPlants.excavator.id, { nextInspectionAt: null });
+    const plant = await service.update(testPlants.excavator.id, { nextInspectionAt: null }, actor);
 
     expect(plant.nextInspectionAt).toBeNull();
   });
@@ -225,10 +233,14 @@ describe('update', () => {
   it('keeps its own serial number without a conflict', async () => {
     const { service } = setup();
 
-    const plant = await service.update(testPlants.loader.id, {
-      serialNumber: testPlants.loader.serialNumber,
-      name: 'Renamed',
-    });
+    const plant = await service.update(
+      testPlants.loader.id,
+      {
+        serialNumber: testPlants.loader.serialNumber,
+        name: 'Renamed',
+      },
+      actor,
+    );
 
     expect(plant.name).toBe('Renamed');
   });
@@ -237,14 +249,22 @@ describe('update', () => {
     const { service } = setup();
 
     await expect(
-      service.update(testPlants.loader.id, { serialNumber: testPlants.excavator.serialNumber }),
+      service.update(
+        testPlants.loader.id,
+        { serialNumber: testPlants.excavator.serialNumber },
+        actor,
+      ),
     ).rejects.toBeInstanceOf(ConflictError);
   });
 
   it('moves a plant to another active site and updates both counts', async () => {
     const { service, sites } = setup();
 
-    const plant = await service.update(testPlants.loader.id, { siteId: testSites.emptyYard.id });
+    const plant = await service.update(
+      testPlants.loader.id,
+      { siteId: testSites.emptyYard.id },
+      actor,
+    );
 
     expect(plant.siteName).toBe('Empty Yard');
     const count = (id: string) => sites.rows.find((s) => s.id === id)?.plantCount;
@@ -256,7 +276,7 @@ describe('update', () => {
     const { service } = setup();
 
     await expect(
-      service.update(testPlants.loader.id, { siteId: testSites.closedYard.id }),
+      service.update(testPlants.loader.id, { siteId: testSites.closedYard.id }, actor),
     ).rejects.toThrow('inactive site');
   });
 
@@ -265,7 +285,7 @@ describe('update', () => {
     const parked = { ...testPlants.loader, siteId: testSites.closedYard.id };
     const service = createPlantService({ plants: fakePlants(sites, [parked]), sites });
 
-    const plant = await service.update(parked.id, { status: 'INACTIVE' });
+    const plant = await service.update(parked.id, { status: 'INACTIVE' }, actor);
 
     expect(plant.status).toBe('INACTIVE');
   });
@@ -273,7 +293,9 @@ describe('update', () => {
   it('throws NotFoundError for an unknown id', async () => {
     const { service } = setup();
 
-    await expect(service.update(missingId, { name: 'x' })).rejects.toBeInstanceOf(NotFoundError);
+    await expect(service.update(missingId, { name: 'x' }, actor)).rejects.toBeInstanceOf(
+      NotFoundError,
+    );
   });
 });
 
@@ -281,7 +303,7 @@ describe('remove', () => {
   it('deletes a plant without inspections', async () => {
     const { service, plants } = setup();
 
-    await service.remove(testPlants.loader.id);
+    await service.remove(testPlants.loader.id, actor);
 
     expect(plants.rows.map((p) => p.id)).toEqual([testPlants.excavator.id]);
   });
@@ -289,7 +311,7 @@ describe('remove', () => {
   it('refuses to delete a plant with inspection history', async () => {
     const { service, plants } = setup();
 
-    await expect(service.remove(testPlants.excavator.id)).rejects.toThrow(
+    await expect(service.remove(testPlants.excavator.id, actor)).rejects.toThrow(
       'set its status to INACTIVE',
     );
     expect(plants.rows).toHaveLength(2);
@@ -298,6 +320,6 @@ describe('remove', () => {
   it('throws NotFoundError for an unknown id', async () => {
     const { service } = setup();
 
-    await expect(service.remove(missingId)).rejects.toBeInstanceOf(NotFoundError);
+    await expect(service.remove(missingId, actor)).rejects.toBeInstanceOf(NotFoundError);
   });
 });

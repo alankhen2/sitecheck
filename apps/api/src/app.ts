@@ -7,10 +7,12 @@ import {
 import { healthResponseSchema, type HealthResponse } from '@sitecheck/shared';
 import type { Config } from './config.js';
 import { authPlugin } from './plugins/auth.js';
+import { auditRoutes } from './routes/audit.js';
 import { authRoutes } from './routes/auth.js';
 import { inspectionRoutes } from './routes/inspections.js';
 import { plantRoutes } from './routes/plants.js';
 import { siteRoutes } from './routes/sites.js';
+import type { AuditService } from './services/audit.service.js';
 import type { AuthService } from './services/auth.service.js';
 import { DomainError, toErrorResponse } from './services/errors.js';
 import type { InspectionService } from './services/inspections.service.js';
@@ -23,6 +25,7 @@ export interface AppDeps {
   sites: SiteService;
   plants: PlantService;
   inspections: InspectionService;
+  audit: AuditService;
 }
 
 /**
@@ -31,7 +34,7 @@ export interface AppDeps {
  * Dependensi (config, service) dimasukkan dari luar, jadi test bisa memakai
  * versi palsu tanpa database.
  */
-export async function buildApp({ config, auth, sites, plants, inspections }: AppDeps) {
+export async function buildApp({ config, auth, sites, plants, inspections, audit }: AppDeps) {
   const app = Fastify({ logger: config.NODE_ENV !== 'test' }).withTypeProvider<ZodTypeProvider>();
 
   // Zod schemas from packages/shared validate requests and shape responses.
@@ -63,6 +66,7 @@ export async function buildApp({ config, auth, sites, plants, inspections }: App
   await app.register(siteRoutes, { sites });
   await app.register(plantRoutes, { plants });
   await app.register(inspectionRoutes, { inspections });
+  await app.register(auditRoutes, { audit });
 
   // Tidak ada yang di-await di sini, jadi handler-nya sync. Fastify tetap
   // mengirim nilai yang di-return.

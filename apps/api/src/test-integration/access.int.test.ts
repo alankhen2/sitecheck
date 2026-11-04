@@ -82,6 +82,7 @@ const endpoints: Endpoint[] = [
   },
   { method: 'delete', path: (ids) => `/plants/${ids.plantId}`, allowed: 'admin' },
   { method: 'get', path: (ids) => `/plants/${ids.plantId}/inspections`, allowed: 'inspector' },
+  { method: 'get', path: (ids) => `/plants/${ids.plantId}/history`, allowed: 'inspector' },
   {
     method: 'post',
     path: (ids) => `/plants/${ids.plantId}/inspections`,

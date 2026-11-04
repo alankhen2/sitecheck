@@ -1,4 +1,12 @@
+import type { AuditAction, AuditChanges, AuditEntity } from '@sitecheck/shared';
 import { randomUUID } from 'node:crypto';
+import {
+  changesBetween,
+  inspectionSnapshot,
+  plantSnapshot,
+  type AuditRecord,
+  type AuditRepository,
+} from '../services/audit.service.js';
 import {
   EmailTakenError,
   type NewUser,
@@ -62,6 +70,48 @@ export function fakeSites(initial: SiteRecord[] = []): SiteRepository & { rows: 
 }
 
 const day = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
+
+interface FakeAuditWrite {
+  /** The plant this entry shows up under; the database works that out with a query. */
+  plantId: string;
+  userId: string;
+  entity: AuditEntity;
+  entityId: string;
+  action: AuditAction;
+  changes: AuditChanges;
+  createdAt?: Date;
+}
+
+/** In-memory AuditRepository. The fake plant and inspection stores write to it. */
+export function fakeAudit(users: UserRecord[] = []): AuditRepository & {
+  rows: (AuditRecord & { plantId: string })[];
+  write(e: FakeAuditWrite): void;
+} {
+  const rows: (AuditRecord & { plantId: string })[] = [];
+  return {
+    rows,
+    write: ({ plantId, userId, entity, entityId, action, changes, createdAt = new Date() }) => {
+      rows.push({
+        id: randomUUID(),
+        plantId,
+        entity,
+        entityId,
+        action,
+        changes,
+        createdAt,
+        actorName: users.find((u) => u.id === userId)?.name ?? 'Unknown',
+      });
+    },
+    listForPlant: (plantId, { skip, take }) => {
+      const matches = rows
+        .filter((entry) => entry.plantId === plantId)
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      return Promise.resolve({ rows: matches.slice(skip, skip + take), total: matches.length });
+    },
+  };
+}
+
+const noAudit = { write: () => undefined };
 
 export const testSites = {
   quarry: {
@@ -141,6 +191,7 @@ export function fakePlants(
   sites: { rows: SiteRecord[] },
   initial: PlantRecord[] = [],
   inspectionCounts: Record<string, number> = {},
+  audit: Pick<ReturnType<typeof fakeAudit>, 'write'> = noAudit,
 ): PlantRepository & { rows: PlantRecord[] } {
   const rows = initial.map(copy);
   const find = (id: string) => rows.find((p) => p.id === id);
@@ -182,7 +233,7 @@ export function fakePlants(
       return Promise.resolve(plant ? copy(plant) : null);
     },
     countInspections: (id) => Promise.resolve(inspectionCounts[id] ?? 0),
-    create: (data) => {
+    create: (data, actorId) => {
       const s = site(data.siteId);
       if (!s) return Promise.reject(new InvalidReferenceError('Site does not exist'));
       if (serialTaken(data.serialNumber)) return Promise.reject(new SerialNumberTakenError());
@@ -190,11 +241,20 @@ export function fakePlants(
       const plant = { ...data, id: randomUUID(), siteName: s.name, createdAt: now, updatedAt: now };
       rows.push(plant);
       bump(plant.siteId, 1);
+      audit.write({
+        plantId: plant.id,
+        userId: actorId,
+        entity: 'Plant',
+        entityId: plant.id,
+        action: 'CREATE',
+        changes: changesBetween(null, plantSnapshot(plant)),
+      });
       return Promise.resolve(copy(plant));
     },
-    update: (id, changes) => {
+    update: (id, changes, actorId) => {
       const plant = find(id);
       if (!plant) return Promise.reject(new NotFoundError('Plant'));
+      const before = plantSnapshot(plant);
       if (changes.serialNumber !== undefined && serialTaken(changes.serialNumber, id)) {
         return Promise.reject(new SerialNumberTakenError());
       }
@@ -206,15 +266,34 @@ export function fakePlants(
         plant.siteName = target.name;
       }
       Object.assign(plant, changes, { updatedAt: new Date() });
+      const auditChanges = changesBetween(before, plantSnapshot(plant));
+      if (Object.keys(auditChanges).length > 0) {
+        audit.write({
+          plantId: id,
+          userId: actorId,
+          entity: 'Plant',
+          entityId: id,
+          action: 'UPDATE',
+          changes: auditChanges,
+        });
+      }
       return Promise.resolve(copy(plant));
     },
-    delete: (id) => {
+    delete: (id, actorId) => {
       const index = rows.findIndex((p) => p.id === id);
       const plant = rows[index];
       if (!plant) return Promise.reject(new NotFoundError('Plant'));
       if ((inspectionCounts[id] ?? 0) > 0) return Promise.reject(new PlantHasInspectionsError());
       rows.splice(index, 1);
       bump(plant.siteId, -1);
+      audit.write({
+        plantId: id,
+        userId: actorId,
+        entity: 'Plant',
+        entityId: id,
+        action: 'DELETE',
+        changes: changesBetween(plantSnapshot(plant), null),
+      });
       return Promise.resolve();
     },
   };
@@ -228,6 +307,7 @@ export function fakeInspections(
   plants: { rows: PlantRecord[] },
   users: UserRecord[],
   inspectionCounts: Record<string, number> = {},
+  audit: Pick<ReturnType<typeof fakeAudit>, 'write'> = noAudit,
 ): InspectionRepository & { rows: InspectionRecord[] } {
   const rows: InspectionRecord[] = [];
   return {
@@ -236,7 +316,19 @@ export function fakeInspections(
       const plant = plants.rows.find((p) => p.id === plantId);
       if (!plant) return Promise.reject(new NotFoundError('Plant'));
       if (plant.status === 'INACTIVE') return Promise.reject(new PlantInactiveError());
+      const before = plantSnapshot(plant);
       Object.assign(plant, plantChanges, { updatedAt: new Date() });
+      const auditChanges = changesBetween(before, plantSnapshot(plant));
+      if (Object.keys(auditChanges).length > 0) {
+        audit.write({
+          plantId,
+          userId: inspectorId,
+          entity: 'Plant',
+          entityId: plantId,
+          action: 'UPDATE',
+          changes: auditChanges,
+        });
+      }
       inspectionCounts[plantId] = (inspectionCounts[plantId] ?? 0) + 1;
       const inspection: InspectionRecord = {
         id: randomUUID(),
@@ -250,6 +342,14 @@ export function fakeInspections(
           .map(({ label, passed, comment }) => ({ label, passed, comment })),
       };
       rows.push(inspection);
+      audit.write({
+        plantId,
+        userId: inspectorId,
+        entity: 'Inspection',
+        entityId: inspection.id,
+        action: 'CREATE',
+        changes: changesBetween(null, inspectionSnapshot(result)),
+      });
       return Promise.resolve(inspection);
     },
     listForPlant: (plantId, { skip, take }) => {

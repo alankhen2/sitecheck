@@ -52,7 +52,8 @@ export const plantRoutes: FastifyPluginAsyncZod<{ plants: PlantService }> = (app
       onRequest: staff,
       schema: { body: createPlantBodySchema, response: { 201: plantSchema, ...errors } },
     },
-    async (request, reply) => reply.code(201).send(await plants.create(request.body)),
+    async (request, reply) =>
+      reply.code(201).send(await plants.create(request.body, request.user.id)),
   );
 
   app.patch(
@@ -65,7 +66,7 @@ export const plantRoutes: FastifyPluginAsyncZod<{ plants: PlantService }> = (app
         response: { 200: plantSchema, ...errors },
       },
     },
-    (request) => plants.update(request.params.id, request.body),
+    (request) => plants.update(request.params.id, request.body, request.user.id),
   );
 
   app.delete(
@@ -78,7 +79,7 @@ export const plantRoutes: FastifyPluginAsyncZod<{ plants: PlantService }> = (app
       },
     },
     async (request, reply) => {
-      await plants.remove(request.params.id);
+      await plants.remove(request.params.id, request.user.id);
       return reply.code(204).send();
     },
   );

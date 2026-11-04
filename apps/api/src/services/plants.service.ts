@@ -49,16 +49,19 @@ export interface PlantRepository {
   findById(id: string): Promise<PlantRecord | null>;
   findBySerialNumber(serialNumber: string): Promise<PlantRecord | null>;
   countInspections(id: string): Promise<number>;
-  /** Throws SerialNumberTakenError or InvalidReferenceError (site gone) on a race. */
-  create(data: NewPlant): Promise<PlantRecord>;
+  /**
+   * Every write also records an audit entry for `actorId`, in one transaction.
+   * Throws SerialNumberTakenError or InvalidReferenceError (site gone) on a race.
+   */
+  create(data: NewPlant, actorId: string): Promise<PlantRecord>;
   /** Same errors as create, plus NotFoundError if the plant was deleted meanwhile. */
-  update(id: string, changes: PlantChanges): Promise<PlantRecord>;
+  update(id: string, changes: PlantChanges, actorId: string): Promise<PlantRecord>;
   /**
    * Deletes only if the plant has no inspections, in one statement, so an
    * inspection saved after the service's check cannot be cascade-deleted.
    * Throws NotFoundError or PlantHasInspectionsError.
    */
-  delete(id: string): Promise<void>;
+  delete(id: string, actorId: string): Promise<void>;
 }
 
 export class SerialNumberTakenError extends ConflictError {
@@ -148,17 +151,17 @@ export function createPlantService({ plants, sites }: PlantServiceDeps) {
       return toPlant(await findOrThrow(id));
     },
 
-    async create(input: CreatePlantBody): Promise<Plant> {
+    async create(input: CreatePlantBody, actorId: string): Promise<Plant> {
       await assertSiteAcceptsPlants(input.siteId);
       await assertSerialFree(input.serialNumber);
-      const plant = await plants.create({
-        ...input,
-        nextInspectionAt: toDate(input.nextInspectionAt),
-      });
+      const plant = await plants.create(
+        { ...input, nextInspectionAt: toDate(input.nextInspectionAt) },
+        actorId,
+      );
       return toPlant(plant);
     },
 
-    async update(id: string, input: UpdatePlantBody): Promise<Plant> {
+    async update(id: string, input: UpdatePlantBody, actorId: string): Promise<Plant> {
       const current = await findOrThrow(id);
       const { nextInspectionAt, ...rest } = definedOnly(input);
 
@@ -173,14 +176,14 @@ export function createPlantService({ plants, sites }: PlantServiceDeps) {
         nextInspectionAt === undefined
           ? rest
           : { ...rest, nextInspectionAt: toDate(nextInspectionAt) };
-      return toPlant(await plants.update(id, changes));
+      return toPlant(await plants.update(id, changes, actorId));
     },
 
-    async remove(id: string): Promise<void> {
+    async remove(id: string, actorId: string): Promise<void> {
       await findOrThrow(id);
       // Inspection history is compliance evidence: refuse rather than cascade.
       if ((await plants.countInspections(id)) > 0) throw new PlantHasInspectionsError();
-      await plants.delete(id);
+      await plants.delete(id, actorId);
     },
   };
 }
