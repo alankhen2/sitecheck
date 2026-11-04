@@ -24,6 +24,7 @@ pnpm monorepo:
   - `src/test-integration/`: integration test setup. It refuses any database whose name does not end in `_test`, because it truncates every table.
   - `prisma/schema.prisma`, `prisma/migrations/`; client generated to `src/generated/` (gitignored).
 - `packages/shared`: Zod schemas and inferred types shared by web and api. Built to `dist/`.
+- `apps/e2e`: Playwright tests of whole user flows in a real browser, against the production web build and the real API. `apps/api/src/test-e2e/serve.ts` drops and recreates `sitecheck_e2e` on every run and refuses any database whose name does not end in `_e2e`.
 
 ## Commands
 
@@ -33,6 +34,7 @@ Run from the repo root. On Windows PowerShell with a restricted execution policy
 - `pnpm dev`: build shared, then run web (5173) and api (3000) in watch mode.
 - `pnpm lint` / `pnpm typecheck` / `pnpm test` / `pnpm build`: same checks CI runs. `pnpm test` is unit tests only (no database).
 - `pnpm test:integration`: the real app (Supertest + Prisma) against `sitecheck_test`, created and migrated automatically. Needs the db container. Files are `*.int.test.ts` in `apps/api/src`.
+- `pnpm test:e2e`: build the web app, then run Playwright on its own ports (3100, 4173), so running dev servers are not touched. Needs the db container, and once `pnpm --filter @sitecheck/e2e exec playwright install chromium`.
 - `pnpm format`: Prettier write. `pnpm format:check` is what CI uses.
 - `pnpm --filter @sitecheck/api db:migrate`: create and apply a migration (local only).
 - `pnpm --filter @sitecheck/api db:seed`: idempotent demo data (2 users, 3 sites, 15 plants, 7 inspections).

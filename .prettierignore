@@ -1,4 +1,6 @@
 dist
+apps/e2e/test-results
+apps/e2e/playwright-report
 coverage
 node_modules
 pnpm-lock.yaml

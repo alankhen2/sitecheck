@@ -7,7 +7,16 @@ import prettier from 'eslint-config-prettier';
 import globals from 'globals';
 
 export default tseslint.config(
-  { ignores: ['**/dist/**', '**/node_modules/**', '**/coverage/**', '**/generated/**'] },
+  {
+    ignores: [
+      '**/dist/**',
+      '**/node_modules/**',
+      '**/coverage/**',
+      '**/generated/**',
+      'apps/e2e/playwright-report/**',
+      'apps/e2e/test-results/**',
+    ],
+  },
 
   // Base rules for every TypeScript file in the monorepo.
   // "TypeChecked" presets read tsconfig, so rules can use type information
@@ -44,7 +53,7 @@ export default tseslint.config(
 
   // Node: api + shared.
   {
-    files: ['apps/api/**/*.ts', 'packages/shared/**/*.ts'],
+    files: ['apps/api/**/*.ts', 'apps/e2e/**/*.ts', 'packages/shared/**/*.ts'],
     languageOptions: { globals: globals.node },
   },
 

@@ -7,9 +7,10 @@ export default defineConfig({
   server: {
     port: 5173,
     // Request ke /api/* diteruskan ke Fastify, jadi tidak perlu CORS saat development.
+    // `vite preview` memakai proxy yang sama. Tes Playwright mengarahkannya ke API-nya sendiri.
     proxy: {
       '/api': {
-        target: 'http://localhost:3000',
+        target: process.env.API_PROXY_TARGET ?? 'http://localhost:3000',
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
     },

@@ -3,6 +3,10 @@ dist/
 coverage/
 *.tsbuildinfo
 
+# Playwright output
+apps/e2e/test-results/
+apps/e2e/playwright-report/
+
 # env
 .env
 .env.*
