@@ -11,12 +11,12 @@ beforeEach(() => {
 });
 
 describe('routes', () => {
-  it('sends / to the plants page', async () => {
+  it('sends / to the dashboard', async () => {
     server.use(authHandlers.loggedInAs(adminUser));
     const { router } = renderApp('/');
 
-    expect(await screen.findByRole('heading', { name: 'Plants' })).toBeInTheDocument();
-    expect(currentUrl(router)).toBe('/plants');
+    expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
+    expect(currentUrl(router)).toBe('/dashboard');
   });
 
   it('marks the current page in the navigation', async () => {

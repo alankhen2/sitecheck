@@ -168,6 +168,24 @@ export function dataHandlers(
     });
   });
 
+  // The API's rule: inactive plants count by status but are never due.
+  const dashboardHandler = http.get(apiUrl('/dashboard'), () => {
+    const now = Date.now();
+    const count = (status: Plant['status']) => plants.filter((p) => p.status === status).length;
+    const due = (matches: (time: number) => boolean) => {
+      const items = plants
+        .filter((p) => p.status !== 'INACTIVE' && p.nextInspectionAt !== null)
+        .filter((p) => matches(Date.parse(p.nextInspectionAt ?? '')))
+        .sort((a, b) => (a.nextInspectionAt ?? '').localeCompare(b.nextInspectionAt ?? ''));
+      return { items: items.slice(0, 10), total: items.length };
+    };
+    return HttpResponse.json({
+      counts: { ACTIVE: count('ACTIVE'), REPAIR: count('REPAIR'), INACTIVE: count('INACTIVE') },
+      overdue: due((time) => time < now),
+      dueSoon: due((time) => time >= now && time <= now + 7 * 24 * 60 * 60 * 1000),
+    });
+  });
+
   const plantHandler = http.get(apiUrl('/plants/:id'), ({ params }) => {
     const plant = plants.find((p) => p.id === params.id);
     return plant ? HttpResponse.json(plant) : notFound('Plant');
@@ -350,6 +368,7 @@ export function dataHandlers(
     sites: sitesHandler,
     handlers: [
       plantsHandler,
+      dashboardHandler,
       plantHandler,
       historyHandler,
       inspectionsHandler,

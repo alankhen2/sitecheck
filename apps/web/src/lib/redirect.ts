@@ -1,4 +1,4 @@
-export const DEFAULT_PATH = '/plants';
+export const DEFAULT_PATH = '/dashboard';
 
 /**
  * Where to go after login, from the `?from=` parameter. Only a path on this

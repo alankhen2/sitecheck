@@ -34,6 +34,14 @@ describe('automatic accessibility checks', () => {
     ['wide screen', 1280],
     ['phone', PHONE_WIDTH],
   ])('on a %s', (_label, width) => {
+    it('dashboard', async () => {
+      setViewportWidth(width);
+      loggedIn();
+      renderApp('/dashboard');
+      await screen.findByRole('list', { name: 'Plants by status' });
+      expect(await a11yProblems()).toEqual([]);
+    });
+
     it('plants page', async () => {
       setViewportWidth(width);
       loggedIn();

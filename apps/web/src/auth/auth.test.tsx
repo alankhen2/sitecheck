@@ -121,8 +121,8 @@ describe('login page', () => {
 
     await fillLogin(user);
 
-    await screen.findByRole('heading', { name: 'Plants' });
-    expect(currentUrl(router)).toBe('/plants');
+    await screen.findByRole('heading', { name: 'Dashboard' });
+    expect(currentUrl(router)).toBe('/dashboard');
   });
 
   it('skips the form when the user is already logged in', async () => {

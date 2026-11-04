@@ -5,6 +5,7 @@ import { useUser } from '../auth/user-context';
 import { userMessage } from '../lib/errors';
 
 const links = [
+  { to: '/dashboard', label: 'Dashboard' },
   { to: '/plants', label: 'Plants' },
   { to: '/sites', label: 'Sites' },
 ];

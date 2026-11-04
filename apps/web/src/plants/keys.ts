@@ -10,6 +10,8 @@ import type { ListPlantsQuery, Plant } from '@sitecheck/shared';
  */
 export const plantKeys = {
   all: ['plants'] as const,
+  /** Counts and due dates are plant data, so they refresh with every plant change. */
+  dashboard: ['plants', 'dashboard'] as const,
   list: (query: ListPlantsQuery) => ['plants', 'list', query] as const,
   detail: (id: Plant['id']) => ['plants', 'detail', id] as const,
   inspections: (id: Plant['id'], page: number) =>
