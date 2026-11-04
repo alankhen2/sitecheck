@@ -37,7 +37,7 @@ export const publicUserSchema = z.object({
 export type PublicUser = z.infer<typeof publicUserSchema>;
 
 /**
- * Stable names for the 409s a client may want to react to differently. The
+ * Stable names for the errors a client may want to react to differently. The
  * message is for people and may be reworded; the code is for programs (e.g.
  * the web app shows SERIAL_NUMBER_TAKEN on the serial number field).
  */
@@ -47,6 +47,7 @@ export const errorCodeSchema = z.enum([
   'SITE_HAS_PLANTS',
   'PLANT_HAS_INSPECTIONS',
   'PLANT_INACTIVE',
+  'RATE_LIMITED',
 ]);
 export type ErrorCode = z.infer<typeof errorCodeSchema>;
 
