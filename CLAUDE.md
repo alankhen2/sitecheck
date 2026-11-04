@@ -9,8 +9,8 @@ pnpm monorepo:
 
 - `apps/web`: React 19 + TypeScript + Vite. Dev server proxies `/api/*` to the API.
 - `apps/api`: Fastify 5 + TypeScript + Prisma 7 (PostgreSQL via `@prisma/adapter-pg`).
-  - `src/app.ts`: `buildApp({ config, auth, sites, plants })` builds the app without listening; tests use `buildTestApp` from `src/test-utils/app.ts`. `src/server.ts` wires the real dependencies and listens.
-  - Errors: services throw `DomainError` subclasses from `src/services/errors.ts` (404/409/400); the error handler in `app.ts` sends `{ message }`. Unexpected errors get a generic 500 body (details only in the log).
+  - `src/app.ts`: `buildApp({ config, auth, sites, plants, inspections })` builds the app without listening; tests use `buildTestApp` from `src/test-utils/app.ts`. `src/server.ts` wires the real dependencies and listens.
+  - Errors: services throw `DomainError` subclasses from `src/services/errors.ts` (404/409/400); the error handler in `app.ts` sends `{ message, code? }`. Unexpected errors get a generic 500 body (details only in the log).
   - `src/config.ts`: env parsed with Zod at startup (`JWT_SECRET` required, 32+ chars).
   - `src/db.ts` exports the single shared `prisma` client.
   - `src/lib/`: pure helpers (e.g. `password.ts`, scrypt hashing).
@@ -33,7 +33,7 @@ Run from the repo root. On Windows PowerShell with a restricted execution policy
 - `pnpm test:integration`: the real app (Supertest + Prisma) against `sitecheck_test`, created and migrated automatically. Needs the db container. Files are `*.int.test.ts` in `apps/api/src`.
 - `pnpm format`: Prettier write. `pnpm format:check` is what CI uses.
 - `pnpm --filter @sitecheck/api db:migrate`: create and apply a migration (local only).
-- `pnpm --filter @sitecheck/api db:seed`: idempotent demo data (2 users, 3 sites, 15 plants).
+- `pnpm --filter @sitecheck/api db:seed`: idempotent demo data (2 users, 3 sites, 15 plants, 7 inspections).
 - `pnpm --filter @sitecheck/api db:studio`: browse the database.
 
 First run: copy `apps/api/.env.example` to `apps/api/.env`, start the db, then `db:migrate` and `db:seed`.

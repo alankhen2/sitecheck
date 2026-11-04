@@ -1,11 +1,12 @@
 /**
- * Demo data: 2 users, 3 sites, 15 plants.
- * Idempotent: rows are upserted by a stable key (email, fixed site id,
- * serial number), so running it again resets the demo values without
- * duplicating or deleting anything else.
+ * Demo data: 2 users, 3 sites, 15 plants, 7 inspections.
+ * Idempotent: rows are upserted by a stable key (email, fixed id, serial
+ * number), so running it again resets the demo values without duplicating or
+ * deleting anything else.
  *
  * Run with: pnpm --filter @sitecheck/api db:seed
  */
+import { CHECKLIST_ITEMS } from '@sitecheck/shared';
 import { prisma } from './db.js';
 import { hashPassword } from './lib/password.js';
 import type { PlantStatus, Role } from './generated/prisma/client.js';
@@ -175,6 +176,67 @@ const plants: {
   },
 ];
 
+/**
+ * Past inspections, written straight to the tables, so their effects are not
+ * applied: the dates and statuses of `plants` above must already agree with them.
+ * A pass was 30 days before the plant's next date; a fail left the date alone.
+ */
+const inspections: {
+  id: string;
+  serialNumber: string;
+  daysAgo: number;
+  notes: string | null;
+  failed?: Partial<Record<(typeof CHECKLIST_ITEMS)[number], string>>;
+}[] = [
+  {
+    id: '019a0000-0000-7000-8000-000000000101',
+    serialNumber: 'WGQ-EX-001',
+    daysAgo: 28,
+    notes: null,
+  },
+  {
+    id: '019a0000-0000-7000-8000-000000000102',
+    serialNumber: 'PBT-CR-001',
+    daysAgo: 26,
+    notes: 'Annual service was done the week before.',
+  },
+  {
+    id: '019a0000-0000-7000-8000-000000000103',
+    serialNumber: 'PBT-RS-002',
+    daysAgo: 18,
+    notes: null,
+  },
+  {
+    id: '019a0000-0000-7000-8000-000000000104',
+    serialNumber: 'PBT-FL-004',
+    daysAgo: 37,
+    notes: null,
+  },
+  {
+    id: '019a0000-0000-7000-8000-000000000105',
+    serialNumber: 'PBT-FL-004',
+    daysAgo: 2,
+    notes: 'Tagged out until the brakes are repaired.',
+    failed: { 'Brakes and controls': 'Parking brake does not hold on a slope.' },
+  },
+  {
+    id: '019a0000-0000-7000-8000-000000000106',
+    serialNumber: 'KLY-TT-003',
+    daysAgo: 44,
+    notes: null,
+  },
+  {
+    id: '019a0000-0000-7000-8000-000000000107',
+    serialNumber: 'KLY-TT-003',
+    daysAgo: 3,
+    notes: null,
+    failed: {
+      'Fluid levels and leaks': 'Hydraulic oil leak at the tipper ram.',
+      'Lights and alarms': 'Reversing alarm is silent.',
+    },
+  },
+];
+
 async function main() {
   // Dev-only default. Production seeding must set SEED_PASSWORD explicitly.
   const password = process.env.SEED_PASSWORD ?? 'sitecheck-dev';
@@ -202,13 +264,41 @@ async function main() {
     await prisma.plant.upsert({ where: { serialNumber }, create: plant, update: data });
   }
 
-  const [userCount, siteCount, plantCount] = await Promise.all([
+  const inspector = await prisma.user.findUniqueOrThrow({
+    where: { email: 'inspector@sitecheck.dev' },
+    select: { id: true },
+  });
+  for (const { id, serialNumber, daysAgo, notes, failed = {} } of inspections) {
+    const plant = await prisma.plant.findUniqueOrThrow({
+      where: { serialNumber },
+      select: { id: true },
+    });
+    const items = CHECKLIST_ITEMS.map((label, position) => {
+      const comment = failed[label] ?? null;
+      return { position, label, passed: comment === null, comment };
+    });
+    const data = {
+      plantId: plant.id,
+      inspectorId: inspector.id,
+      result: items.every((item) => item.passed) ? ('PASS' as const) : ('FAIL' as const),
+      notes,
+      inspectedAt: inDays(-daysAgo),
+    };
+    await prisma.inspection.upsert({
+      where: { id },
+      create: { id, ...data, items: { create: items } },
+      update: { ...data, items: { deleteMany: {}, create: items } },
+    });
+  }
+
+  const [userCount, siteCount, plantCount, inspectionCount] = await Promise.all([
     prisma.user.count(),
     prisma.site.count(),
     prisma.plant.count(),
+    prisma.inspection.count(),
   ]);
   console.log(
-    `Seeded: ${String(userCount)} users, ${String(siteCount)} sites, ${String(plantCount)} plants`,
+    `Seeded: ${String(userCount)} users, ${String(siteCount)} sites, ${String(plantCount)} plants, ${String(inspectionCount)} inspections`,
   );
 }
 
