@@ -5,6 +5,7 @@ import { Pagination } from '../components/Pagination';
 import { RowActions } from '../components/RowActions';
 import { userMessage } from '../lib/errors';
 import { useIsWideScreen } from '../lib/useMediaQuery';
+import { usePageHeading } from '../lib/usePageHeading';
 import { useUser } from '../auth/user-context';
 import { DeletePlantDialog } from '../plants/DeletePlantDialog';
 import { PlantCards } from '../plants/PlantCards';
@@ -35,6 +36,7 @@ function resultSummary({ page, pageSize, total }: PlantPage): string {
 }
 
 export function PlantsPage() {
+  const heading = usePageHeading('Plants');
   const [query, update] = usePlantQuery();
   const plants = usePlants(query);
   const filtered = hasFilters(query);
@@ -71,7 +73,9 @@ export function PlantsPage() {
   return (
     <section className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl font-semibold">Plants</h1>
+        <h1 ref={heading} tabIndex={-1} className="text-2xl font-semibold outline-none">
+          Plants
+        </h1>
         <button
           type="button"
           onClick={() => {

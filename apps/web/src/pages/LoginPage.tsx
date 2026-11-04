@@ -5,8 +5,10 @@ import { Navigate, useNavigate, useSearchParams } from 'react-router';
 import { useCurrentUser, useLogin } from '../auth/queries';
 import { userMessage } from '../lib/errors';
 import { safeRedirect } from '../lib/redirect';
+import { usePageHeading } from '../lib/usePageHeading';
 
 export function LoginPage() {
+  const heading = usePageHeading('Log in');
   const [params] = useSearchParams();
   const target = safeRedirect(params.get('from'));
   const navigate = useNavigate();
@@ -40,7 +42,12 @@ export function LoginPage() {
         aria-labelledby="login-title"
         className="w-full max-w-sm rounded-lg border border-slate-200 bg-white p-6 shadow-sm"
       >
-        <h1 id="login-title" className="text-xl font-semibold text-slate-900">
+        <h1
+          ref={heading}
+          id="login-title"
+          tabIndex={-1}
+          className="text-xl font-semibold text-slate-900 outline-none"
+        >
           Log in to SiteCheck
         </h1>
 

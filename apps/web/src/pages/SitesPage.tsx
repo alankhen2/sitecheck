@@ -4,6 +4,7 @@ import { useUser } from '../auth/user-context';
 import { RowActions } from '../components/RowActions';
 import { userMessage } from '../lib/errors';
 import { useIsWideScreen } from '../lib/useMediaQuery';
+import { usePageHeading } from '../lib/usePageHeading';
 import { DeleteSiteDialog } from '../sites/DeleteSiteDialog';
 import { useSites } from '../sites/queries';
 import { SiteCards } from '../sites/SiteCards';
@@ -20,6 +21,7 @@ type OpenDialog =
 const none: OpenDialog = { kind: 'none' };
 
 export function SitesPage() {
+  const heading = usePageHeading('Sites');
   const sites = useSites();
   // Hiding the buttons is for the user's sake; the API refuses inspectors anyway.
   const isAdmin = useUser().role === 'ADMIN';
@@ -46,7 +48,9 @@ export function SitesPage() {
   return (
     <section className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl font-semibold">Sites</h1>
+        <h1 ref={heading} tabIndex={-1} className="text-2xl font-semibold outline-none">
+          Sites
+        </h1>
         {isAdmin && (
           <button
             type="button"

@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { NavLink, Outlet } from 'react-router';
 import { useLogout } from '../auth/queries';
 import { useUser } from '../auth/user-context';
@@ -14,9 +15,22 @@ const roleLabel = { ADMIN: 'Admin', INSPECTOR: 'Inspector' } as const;
 export function AppLayout() {
   const user = useUser();
   const logout = useLogout();
+  const main = useRef<HTMLElement>(null);
 
   return (
     <div className="min-h-dvh bg-slate-50 text-slate-900">
+      {/* The first stop for Tab, so a keyboard user need not cross the menu on every page. */}
+      <a
+        href="#main"
+        onClick={(event) => {
+          // Move focus without "#main" landing in the URL, which holds the filters.
+          event.preventDefault();
+          main.current?.focus();
+        }}
+        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-10 focus:rounded focus:bg-white focus:px-3 focus:py-2 focus:shadow"
+      >
+        Skip to main content
+      </a>
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
           <span className="font-semibold">SiteCheck</span>
@@ -58,7 +72,7 @@ export function AppLayout() {
           </p>
         )}
       </header>
-      <main className="mx-auto max-w-6xl px-4 py-6">
+      <main ref={main} id="main" tabIndex={-1} className="mx-auto max-w-6xl px-4 py-6 outline-none">
         <Outlet />
       </main>
     </div>
