@@ -102,13 +102,16 @@ model Inspection {
 model InspectionItem {
   id           String  @id @default(uuid(7)) @db.Uuid
   inspectionId String  @db.Uuid
+  // Where it stood on the checklist. Ids do not keep this order: several generated
+  // in the same millisecond can sort either way.
+  position     Int
   label        String
   passed       Boolean
   comment      String?
 
   inspection Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
 
-  @@index([inspectionId])
+  @@unique([inspectionId, position])
   @@map("inspection_items")
 }
 
