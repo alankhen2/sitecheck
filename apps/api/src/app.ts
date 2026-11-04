@@ -7,6 +7,7 @@ import {
 import { healthResponseSchema, type HealthResponse } from '@sitecheck/shared';
 import type { Config } from './config.js';
 import { authPlugin } from './plugins/auth.js';
+import { defaultAuthLimits, type AuthLimits } from './plugins/rate-limit.js';
 import { auditRoutes } from './routes/audit.js';
 import { authRoutes } from './routes/auth.js';
 import { dashboardRoutes } from './routes/dashboard.js';
@@ -29,6 +30,8 @@ export interface AppDeps {
   inspections: InspectionService;
   audit: AuditService;
   dashboard: DashboardService;
+  /** Leave out for the real limits. */
+  authLimits?: AuthLimits;
 }
 
 /**
@@ -45,8 +48,13 @@ export async function buildApp({
   inspections,
   audit,
   dashboard,
+  authLimits = defaultAuthLimits,
 }: AppDeps) {
-  const app = Fastify({ logger: config.NODE_ENV !== 'test' }).withTypeProvider<ZodTypeProvider>();
+  const app = Fastify({
+    logger: config.NODE_ENV !== 'test',
+    // hop 0 is the connection itself, hop 1 the address it forwarded, and so on.
+    trustProxy: (_address, hop) => hop < config.TRUST_PROXY,
+  }).withTypeProvider<ZodTypeProvider>();
 
   // Zod schemas from packages/shared validate requests and shape responses.
   app.setValidatorCompiler(validatorCompiler);
@@ -73,7 +81,7 @@ export async function buildApp({
   });
 
   await app.register(authPlugin, { config, auth });
-  await app.register(authRoutes, { auth });
+  await app.register(authRoutes, { auth, limits: authLimits });
   await app.register(siteRoutes, { sites });
   await app.register(plantRoutes, { plants });
   await app.register(inspectionRoutes, { inspections });

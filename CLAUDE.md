@@ -19,6 +19,7 @@ pnpm monorepo:
   - Audit log: every plant and inspection write adds its `AuditLog` entry in the same transaction, in the repository, with the old values read under a row lock (`lockPlant`). Writes take the acting user's id.
   - `src/plugins/auth.ts`: JWT session cookie, `app.authenticate` (401) and `app.requireRole(...)` (401/403), used as `onRequest` hooks so auth runs before body validation; `request.user` is loaded from the db each request.
   - `src/routes/`: thin HTTP handlers with Zod `schema` (body/query/params/response) via `fastify-type-provider-zod`.
+  - `src/plugins/rate-limit.ts`: limits on login and register, counted in memory by `src/lib/rate-limiter.ts` (one server only). `TRUST_PROXY` must match the number of proxies in front of the app, or the limits see the wrong address.
   - `src/test-utils/`: in-memory fakes for unit tests (excluded from the build).
   - `src/test-integration/`: integration test setup. It refuses any database whose name does not end in `_test`, because it truncates every table.
   - `prisma/schema.prisma`, `prisma/migrations/`; client generated to `src/generated/` (gitignored).

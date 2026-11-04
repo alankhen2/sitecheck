@@ -5,6 +5,7 @@ import {
   registerBodySchema,
 } from '@sitecheck/shared';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
+import { createAuthLimitHooks, type AuthLimits } from '../plugins/rate-limit.js';
 import {
   EmailTakenError,
   InvalidCredentialsError,
@@ -13,13 +14,19 @@ import {
 
 // Route handlers only translate HTTP <-> service calls; the rules live in the service.
 // `schema.body` validates the request, `schema.response` strips any field not in the schema.
-export const authRoutes: FastifyPluginAsyncZod<{ auth: AuthService }> = async (app, { auth }) => {
+export const authRoutes: FastifyPluginAsyncZod<{ auth: AuthService; limits: AuthLimits }> = async (
+  app,
+  { auth, limits },
+) => {
+  const limit = createAuthLimitHooks(limits);
+
   app.post(
     '/auth/register',
     {
+      onRequest: limit.registerPerAddress,
       schema: {
         body: registerBodySchema,
-        response: { 201: publicUserSchema, 409: errorResponseSchema },
+        response: { 201: publicUserSchema, 409: errorResponseSchema, 429: errorResponseSchema },
       },
     },
     async (request, reply) => {
@@ -39,9 +46,12 @@ export const authRoutes: FastifyPluginAsyncZod<{ auth: AuthService }> = async (a
   app.post(
     '/auth/login',
     {
+      // Both before the password check, so a refused attempt costs no hashing.
+      onRequest: limit.loginPerAddress,
+      preHandler: limit.loginPerAccount,
       schema: {
         body: loginBodySchema,
-        response: { 200: publicUserSchema, 401: errorResponseSchema },
+        response: { 200: publicUserSchema, 401: errorResponseSchema, 429: errorResponseSchema },
       },
     },
     async (request, reply) => {

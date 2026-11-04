@@ -10,7 +10,16 @@ export { prisma };
 
 /** The production app (real services, real Prisma) on the test database. */
 export async function startApp() {
-  const app = await buildApp({ config: loadConfig(), ...createServices(prisma) });
+  const app = await buildApp({
+    config: loadConfig(),
+    ...createServices(prisma),
+    // Tests log in over and over from one address. rate-limit.int.test.ts uses the real limits.
+    authLimits: {
+      loginPerAccount: 100_000,
+      loginPerAddress: 100_000,
+      registerPerAddress: 100_000,
+    },
+  });
   await app.ready();
   // supertest sends real HTTP requests to the app's server over a socket.
   return { app, http: supertest(app.server) };

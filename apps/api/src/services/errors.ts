@@ -6,7 +6,7 @@ import type { ErrorCode, ErrorResponse } from '@sitecheck/shared';
  * with that status, so route handlers do not need their own try/catch.
  */
 export abstract class DomainError extends Error {
-  abstract readonly statusCode: 400 | 404 | 409;
+  abstract readonly statusCode: 400 | 404 | 409 | 429;
   /** Set when a client may need to tell this error apart from others with the same status. */
   readonly code?: ErrorCode;
 }
@@ -38,6 +38,17 @@ export class InvalidReferenceError extends DomainError {
   constructor(message: string) {
     super(message);
     this.name = 'InvalidReferenceError';
+  }
+}
+
+/** Too many tries in a short time. */
+export class RateLimitedError extends DomainError {
+  readonly statusCode = 429;
+  override readonly code = 'RATE_LIMITED';
+  constructor(retryInMinutes: number) {
+    const unit = retryInMinutes === 1 ? 'minute' : 'minutes';
+    super(`Too many attempts. Try again in ${String(retryInMinutes)} ${unit}.`);
+    this.name = 'RateLimitedError';
   }
 }
 

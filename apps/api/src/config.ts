@@ -8,6 +8,9 @@ const envSchema = z.object({
   HOST: z.string().default('0.0.0.0'),
   // HS256 needs at least 256 bits of key; 32 characters is the floor, a random 43+ is better.
   JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
+  // How many proxies sit in front of the app. 0 ignores X-Forwarded-For, which a
+  // client could otherwise fill in to get a fresh rate limit on every request.
+  TRUST_PROXY: z.coerce.number().int().min(0).default(0),
 });
 
 export type Config = z.infer<typeof envSchema>;
