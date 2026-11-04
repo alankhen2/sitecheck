@@ -56,6 +56,15 @@ export default tseslint.config(
     rules: {
       ...reactHooks.configs.recommended.rules,
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+      // React escapes everything it renders, which is what keeps user text from
+      // running as a script. This attribute is the one way around that.
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "JSXAttribute[name.name='dangerouslySetInnerHTML']",
+          message: 'User text must never be rendered as raw HTML.',
+        },
+      ],
     },
   },
 
