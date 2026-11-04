@@ -113,6 +113,26 @@ describe('login page', () => {
     expect(screen.getByLabelText('Email')).toHaveAttribute('aria-invalid', 'true');
   });
 
+  it('says when to try again after too many attempts, and stays on the form', async () => {
+    server.use(
+      authHandlers.loggedOut(),
+      http.post(apiUrl('/auth/login'), () =>
+        HttpResponse.json(
+          { message: 'Too many attempts. Try again in 15 minutes.', code: 'RATE_LIMITED' },
+          { status: 429, headers: { 'retry-after': '900' } },
+        ),
+      ),
+    );
+    const { router, user } = renderApp('/login');
+
+    await fillLogin(user);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Too many attempts. Try again in 15 minutes.',
+    );
+    expect(currentUrl(router)).toBe('/login');
+  });
+
   it('never redirects to another site after login', async () => {
     server.use(authHandlers.loggedOut(), authHandlers.loginSucceeds(adminUser));
     const { router, user } = renderApp(
