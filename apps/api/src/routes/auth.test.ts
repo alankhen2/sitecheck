@@ -116,6 +116,15 @@ describe('POST /auth/register', () => {
       expect(res.statusCode).toBe(403);
     });
 
+    it('keeps answering 403, never the 429 of a limit it does not count towards', async () => {
+      const { app } = await buildTestApp({ users: [] });
+
+      for (let i = 0; i < 11; i += 1) {
+        const res = await app.inject({ method: 'POST', url: '/auth/register', payload: newPerson });
+        expect(res.statusCode).toBe(403);
+      }
+    });
+
     it('still lets existing users log in', async () => {
       const { app } = await buildTestApp();
 
