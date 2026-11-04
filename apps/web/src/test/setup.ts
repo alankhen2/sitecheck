@@ -2,6 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll } from 'vitest';
 import { recordUnhandled, server, takeUnhandled } from './server';
+import { resetViewport } from './viewport';
 
 // jsdom has <dialog> but not its methods. This stand-in covers what the app
 // uses: open/close toggle the `open` attribute (which makes the element a
@@ -31,6 +32,7 @@ beforeAll(() => {
 
 afterEach(() => {
   cleanup();
+  resetViewport();
   server.resetHandlers();
   // A test that made a request without a handler fails, even if its own
   // assertions passed: no test may depend on a real (or missing) API.

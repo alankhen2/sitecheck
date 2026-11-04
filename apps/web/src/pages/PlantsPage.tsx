@@ -2,9 +2,12 @@ import type { Plant, PlantPage } from '@sitecheck/shared';
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { Pagination } from '../components/Pagination';
+import { RowActions } from '../components/RowActions';
 import { userMessage } from '../lib/errors';
+import { useIsWideScreen } from '../lib/useMediaQuery';
 import { useUser } from '../auth/user-context';
 import { DeletePlantDialog } from '../plants/DeletePlantDialog';
+import { PlantCards } from '../plants/PlantCards';
 import { PlantFilters } from '../plants/PlantFilters';
 import { PlantFormDialog } from '../plants/PlantFormDialog';
 import { PlantTable } from '../plants/PlantTable';
@@ -46,31 +49,23 @@ export function PlantsPage() {
   const sites = useSites();
   const filterSite = sites.data?.find((site) => site.id === query.siteId && site.isActive);
 
+  const isWide = useIsWideScreen();
+  const PlantList = isWide ? PlantTable : PlantCards;
+
   const rowActions = (plant: Plant) => (
-    <>
-      <button
-        type="button"
-        aria-label={`Edit ${plant.name}`}
-        onClick={() => {
-          setDialog({ kind: 'edit', plant });
-        }}
-        className="rounded px-2 py-1 text-amber-700 hover:bg-amber-50"
-      >
-        Edit
-      </button>
-      {canDelete && (
-        <button
-          type="button"
-          aria-label={`Delete ${plant.name}`}
-          onClick={() => {
-            setDialog({ kind: 'delete', plant });
-          }}
-          className="ml-1 rounded px-2 py-1 text-red-700 hover:bg-red-50"
-        >
-          Delete
-        </button>
-      )}
-    </>
+    <RowActions
+      name={plant.name}
+      onEdit={() => {
+        setDialog({ kind: 'edit', plant });
+      }}
+      onDelete={
+        canDelete
+          ? () => {
+              setDialog({ kind: 'delete', plant });
+            }
+          : undefined
+      }
+    />
   );
 
   return (
@@ -118,7 +113,7 @@ export function PlantsPage() {
           </p>
 
           {plants.data.items.length > 0 ? (
-            <PlantTable
+            <PlantList
               plants={plants.data.items}
               stale={plants.isPlaceholderData}
               actions={rowActions}

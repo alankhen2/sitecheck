@@ -25,7 +25,20 @@ export function SiteStatusBadge({ isActive }: { isActive: boolean }) {
 
 const plantsLabel = (count: number) => `${String(count)} ${count === 1 ? 'plant' : 'plants'}`;
 
-/** Every site as a table. The plant count links to the plants page filtered to that site. */
+/** A site's plant count, linking to the plants page filtered to that site. */
+export function PlantCountLink({ site, className = '' }: { site: Site; className?: string }) {
+  return (
+    <Link
+      to={`/plants?siteId=${site.id}`}
+      aria-label={`${plantsLabel(site.plantCount)} at ${site.name}`}
+      className={`text-amber-700 underline-offset-2 hover:underline ${className}`}
+    >
+      {plantsLabel(site.plantCount)}
+    </Link>
+  );
+}
+
+/** Every site as a table, for wide screens (narrow ones get SiteCards). */
 export function SiteTable({ sites, actions }: Props) {
   return (
     <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
@@ -60,13 +73,7 @@ export function SiteTable({ sites, actions }: Props) {
               </th>
               <td className="px-4 py-3 text-slate-700">{site.address}</td>
               <td className="px-4 py-3">
-                <Link
-                  to={`/plants?siteId=${site.id}`}
-                  aria-label={`${plantsLabel(site.plantCount)} at ${site.name}`}
-                  className="text-amber-700 underline-offset-2 hover:underline"
-                >
-                  {plantsLabel(site.plantCount)}
-                </Link>
+                <PlantCountLink site={site} />
               </td>
               <td className="px-4 py-3">
                 <SiteStatusBadge isActive={site.isActive} />

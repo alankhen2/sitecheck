@@ -9,7 +9,9 @@ interface Props {
 }
 
 const select =
-  'rounded border border-slate-300 bg-white px-3 py-2 focus:border-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-600/30';
+  'min-w-0 flex-1 rounded border border-slate-300 bg-white px-3 py-2 focus:border-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-600/30 md:flex-none';
+// Full width on phones: a <select> is as wide as its longest site name otherwise.
+const selectLabel = 'flex w-full items-center gap-2 text-sm text-slate-700 md:w-auto';
 
 /** Search, site, sort and status controls. Every change goes straight to the URL. */
 export function PlantFilters({ query, onChange }: Props) {
@@ -35,7 +37,7 @@ export function PlantFilters({ query, onChange }: Props) {
           }}
         />
 
-        <label className="flex items-center gap-2 text-sm text-slate-700">
+        <label className={selectLabel}>
           Site
           <select
             className={select}
@@ -55,7 +57,7 @@ export function PlantFilters({ query, onChange }: Props) {
           </select>
         </label>
 
-        <label className="flex items-center gap-2 text-sm text-slate-700">
+        <label className={selectLabel}>
           Sort
           <select
             className={select}

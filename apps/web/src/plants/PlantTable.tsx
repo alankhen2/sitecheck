@@ -11,7 +11,7 @@ interface Props {
   actions?: (plant: Plant) => ReactNode;
 }
 
-/** The plant list as a table. On narrow screens it scrolls sideways (cards come in 3.5). */
+/** The plant list as a table, for wide screens (narrow ones get PlantCards). */
 export function PlantTable({ plants, stale, actions }: Props) {
   return (
     <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
