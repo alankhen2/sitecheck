@@ -13,6 +13,7 @@ import {
   type UserRecord,
   type UserRepository,
 } from '../services/auth.service.js';
+import type { DashboardRepository } from '../services/dashboard.service.js';
 import { InvalidReferenceError, NotFoundError } from '../services/errors.js';
 import {
   PlantInactiveError,
@@ -357,6 +358,38 @@ export function fakeInspections(
         .filter((i) => i.plantId === plantId)
         .sort((a, b) => b.inspectedAt.getTime() - a.inspectedAt.getTime());
       return Promise.resolve({ rows: matches.slice(skip, skip + take), total: matches.length });
+    },
+  };
+}
+
+/** In-memory DashboardRepository, reading the fake plant store. */
+export function fakeDashboard(plants: { rows: PlantRecord[] }): DashboardRepository {
+  return {
+    summary: ({ now, soonUntil, limit }) => {
+      const counts: Partial<Record<PlantRecord['status'], number>> = {};
+      for (const { status } of plants.rows) counts[status] = (counts[status] ?? 0) + 1;
+
+      const due = (matches: (time: number) => boolean) => {
+        const rows = plants.rows
+          .filter(
+            (p) =>
+              p.status !== 'INACTIVE' &&
+              p.nextInspectionAt !== null &&
+              matches(p.nextInspectionAt.getTime()),
+          )
+          .sort(
+            (a, b) =>
+              (a.nextInspectionAt?.getTime() ?? 0) - (b.nextInspectionAt?.getTime() ?? 0) ||
+              a.name.localeCompare(b.name),
+          );
+        return { rows: rows.slice(0, limit).map(copy), total: rows.length };
+      };
+
+      return Promise.resolve({
+        counts,
+        overdue: due((time) => time < now.getTime()),
+        dueSoon: due((time) => time >= now.getTime() && time <= soonUntil.getTime()),
+      });
     },
   };
 }

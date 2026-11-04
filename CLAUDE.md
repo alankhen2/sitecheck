@@ -9,7 +9,7 @@ pnpm monorepo:
 
 - `apps/web`: React 19 + TypeScript + Vite. Dev server proxies `/api/*` to the API.
 - `apps/api`: Fastify 5 + TypeScript + Prisma 7 (PostgreSQL via `@prisma/adapter-pg`).
-  - `src/app.ts`: `buildApp({ config, auth, sites, plants, inspections, audit })` builds the app without listening; tests use `buildTestApp` from `src/test-utils/app.ts`. `src/server.ts` wires the real dependencies and listens.
+  - `src/app.ts`: `buildApp({ config, auth, sites, plants, inspections, audit, dashboard })` builds the app without listening; tests use `buildTestApp` from `src/test-utils/app.ts`. `src/server.ts` wires the real dependencies and listens.
   - Errors: services throw `DomainError` subclasses from `src/services/errors.ts` (404/409/400); the error handler in `app.ts` sends `{ message, code? }`. Unexpected errors get a generic 500 body (details only in the log).
   - `src/config.ts`: env parsed with Zod at startup (`JWT_SECRET` required, 32+ chars).
   - `src/db.ts` exports the single shared `prisma` client.

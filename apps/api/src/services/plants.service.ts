@@ -88,7 +88,7 @@ export class PlantHasInspectionsError extends ConflictError {
   }
 }
 
-function toPlant(record: PlantRecord): Plant {
+export function toPlant(record: PlantRecord): Plant {
   return {
     id: record.id,
     siteId: record.siteId,

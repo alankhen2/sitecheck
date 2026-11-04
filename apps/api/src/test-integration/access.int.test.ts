@@ -43,6 +43,7 @@ interface Endpoint {
 let serial = 0;
 const endpoints: Endpoint[] = [
   { method: 'get', path: () => '/auth/me', allowed: 'inspector' },
+  { method: 'get', path: () => '/dashboard', allowed: 'inspector' },
   { method: 'get', path: () => '/sites', allowed: 'inspector' },
   { method: 'get', path: (ids) => `/sites/${ids.siteId}`, allowed: 'inspector' },
   {

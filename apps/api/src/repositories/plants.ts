@@ -38,6 +38,8 @@ type Row = Prisma.PlantGetPayload<{ select: typeof select }>;
 
 const toRecord = ({ site, ...plant }: Row): PlantRecord => ({ ...plant, siteName: site.name });
 
+export { select as plantSelect, toRecord as toPlantRecord };
+
 /**
  * Locks the plant's row until the transaction ends, then reads it. What is read
  * stays true while the transaction decides and writes: a second change waits

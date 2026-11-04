@@ -3,11 +3,13 @@ import { loadConfig, type Config } from '../config.js';
 import { SESSION_COOKIE } from '../plugins/auth.js';
 import { createAuditService } from '../services/audit.service.js';
 import { createAuthService, type UserRecord } from '../services/auth.service.js';
+import { createDashboardService } from '../services/dashboard.service.js';
 import { createInspectionService } from '../services/inspections.service.js';
 import { createPlantService, type PlantRecord } from '../services/plants.service.js';
 import { createSiteService, type SiteRecord } from '../services/sites.service.js';
 import {
   fakeAudit,
+  fakeDashboard,
   fakeHashPassword,
   fakeInspections,
   fakePlants,
@@ -57,6 +59,7 @@ export async function buildTestApp(seed: Seed = {}) {
     plants: createPlantService({ plants, sites }),
     inspections: createInspectionService({ inspections, plants }),
     audit: createAuditService({ audit, plants }),
+    dashboard: createDashboardService({ dashboard: fakeDashboard(plants) }),
   });
   return { app, users, sites, plants, inspections, audit };
 }
