@@ -36,7 +36,7 @@ Run from the repo root. On Windows PowerShell with a restricted execution policy
 - `pnpm lint` / `pnpm typecheck` / `pnpm test` / `pnpm build`: same checks CI runs. `pnpm test` is unit tests only (no database).
 - `pnpm test:integration`: the real app (Supertest + Prisma) against `sitecheck_test`, created and migrated automatically. Needs the db container. Files are `*.int.test.ts` in `apps/api/src`.
 - `pnpm test:e2e`: build the web app, then run Playwright on its own ports (3100, 4173), so running dev servers are not touched. Needs the db container, and once `pnpm --filter @sitecheck/e2e exec playwright install chromium`.
-- `pnpm demo:record`: record the demo video (`apps/e2e/demo`) on the same throwaway servers, with the demo login button built in. Writes `apps/e2e/demo-output/sitecheck-demo.webm` (gitignored). Not run in CI.
+- `pnpm demo:record`: record the demo video (`apps/e2e/demo`) on the same throwaway servers, with the demo login button built in. Writes `apps/e2e/demo-output/sitecheck-demo.webm` (gitignored) and the README screenshots in `docs/images/` (committed). Not run in CI.
 - `pnpm format`: Prettier write. `pnpm format:check` is what CI uses.
 - `pnpm --filter @sitecheck/api db:migrate`: create and apply a migration (local only).
 - `pnpm --filter @sitecheck/api db:seed`: idempotent demo data (3 users, 3 sites, 15 plants, 7 inspections). The demo account's password is public, so `DEMO_PASSWORD` must differ from `SEED_PASSWORD` in production.

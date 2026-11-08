@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { CHECKLIST_ITEMS } from '@sitecheck/shared';
+import path from 'node:path';
 import { E2E_PASSWORD, inspector } from '../tests/test-data';
 
 // The demo video: one slow walk through the app, with captions instead of a voice.
@@ -9,6 +10,8 @@ const size = { width: 1280, height: 720 };
 const output = 'demo-output/sitecheck-demo.webm';
 const CAPTION_ID = 'demo-caption';
 const CURSOR_ID = 'demo-cursor';
+// The README's screenshots, committed, so a new recording shows up in the diff.
+const images = path.resolve(import.meta.dirname, '../../../docs/images');
 
 /**
  * Runs in every page before the app: a caption bar and a visible cursor, because
@@ -78,6 +81,18 @@ async function say(page: Page, text: string, readMs = 2800): Promise<void> {
   await page.waitForTimeout(readMs);
 }
 
+/** A screenshot for the README, without the caption and cursor drawn for the video. */
+async function snap(page: Page, name: string, fullPage = false): Promise<void> {
+  const overlay = [CAPTION_ID, CURSOR_ID];
+  await page.evaluate((ids) => {
+    for (const id of ids) document.getElementById(id)?.style.setProperty('visibility', 'hidden');
+  }, overlay);
+  await page.screenshot({ path: path.join(images, `${name}.png`), fullPage });
+  await page.evaluate((ids) => {
+    for (const id of ids) document.getElementById(id)?.style.removeProperty('visibility');
+  }, overlay);
+}
+
 /** Glides the mouse to the element so the viewer can follow, then acts on it. */
 async function reach(page: Page, target: Locator): Promise<void> {
   await target.scrollIntoViewIfNeeded();
@@ -118,6 +133,7 @@ test('record the demo video', async ({ browser }) => {
   await click(page, page.getByRole('button', { name: 'Log in' }));
   await expect(page.getByRole('heading', { name: 'Dashboard', level: 1 })).toBeVisible();
 
+  await snap(page, 'dashboard');
   await say(page, 'The dashboard counts plants by status and lists inspections that are due');
   await reach(page, page.getByRole('list', { name: 'Plants by status' }));
   await page.waitForTimeout(1500);
@@ -147,12 +163,18 @@ test('record the demo video', async ({ browser }) => {
   await page.waitForTimeout(1500);
 
   await type(page, page.getByLabel(`Comment on ${failedItem}`), 'Hydraulic hose is leaking.');
+  await page.evaluate(() => {
+    window.scrollTo(0, 0);
+  });
+  await snap(page, 'inspection-form');
   await click(page, page.getByRole('button', { name: 'Save inspection' }));
   await expect(page.getByText('Inspection failed. Its status is now Repair.')).toBeVisible();
   await say(page, 'Saved: a failed inspection puts the plant in Repair', 3200);
 
   const changes = page.getByRole('list', { name: 'Changes' });
   await expect(changes.getByText('Status changed from Active to Repair')).toBeVisible();
+  // After the history has loaded, or the full-page shot cuts it off.
+  await snap(page, 'plant-history', true);
   await reach(page, changes);
   await say(page, 'Who changed what, and when, is kept as history', 3200);
 
