@@ -8,7 +8,7 @@ It is a portfolio project. The goal was a small app built the way a team would b
 
 ## Demo
 
-<!-- Demo video goes here (uploaded through GitHub's README editor). -->
+https://github.com/user-attachments/assets/701ed9c2-cf20-4a22-8a8f-4222e7aaa00b
 
 A one-minute walk through the app: an inspector records a failed inspection, then the read-only demo account looks around and cannot change anything.
 
