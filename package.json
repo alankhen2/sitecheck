@@ -9,6 +9,7 @@
     "test": "pnpm -r --if-present test",
     "test:integration": "pnpm --filter @sitecheck/shared build && pnpm --filter @sitecheck/api test:integration",
     "test:e2e": "pnpm --filter @sitecheck/shared build && pnpm --filter @sitecheck/web build && pnpm --filter @sitecheck/e2e test:e2e",
+    "demo:record": "pnpm --filter @sitecheck/shared build && pnpm --filter @sitecheck/e2e demo:record",
     "lint": "pnpm --filter @sitecheck/shared build && eslint .",
     "lint:fix": "pnpm --filter @sitecheck/shared build && eslint . --fix",
     "format": "prettier . --write",

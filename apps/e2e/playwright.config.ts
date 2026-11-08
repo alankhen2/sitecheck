@@ -12,6 +12,31 @@ const databaseUrl =
   process.env.E2E_DATABASE_URL ??
   'postgresql://sitecheck:sitecheck@localhost:5432/sitecheck_e2e?schema=public';
 
+/** The API on a fresh, seeded end-to-end database. Shared with the demo recording. */
+export const apiServer = {
+  command: 'pnpm --filter @sitecheck/api e2e:serve',
+  url: `${apiUrl}/health`,
+  reuseExistingServer: false,
+  env: {
+    NODE_ENV: 'test',
+    HOST: '127.0.0.1',
+    PORT: String(API_PORT),
+    DATABASE_URL: databaseUrl,
+    JWT_SECRET: 'e2e-only-secret-that-signs-nothing-real',
+    SEED_PASSWORD: E2E_PASSWORD,
+    DEMO_PASSWORD: E2E_DEMO_PASSWORD,
+  },
+};
+
+/** Serves the production build in `apps/web/dist`, whichever command built it. */
+export const webServer = {
+  // The production build, not the dev server: what users would really get.
+  command: `pnpm --filter @sitecheck/web exec vite preview --port ${String(WEB_PORT)} --strictPort`,
+  url: webUrl,
+  reuseExistingServer: false,
+  env: { API_PROXY_TARGET: apiUrl },
+};
+
 export default defineConfig({
   testDir: './tests',
   // One database, so one test at a time.
@@ -28,27 +53,5 @@ export default defineConfig({
     screenshot: 'only-on-failure',
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
-  webServer: [
-    {
-      command: 'pnpm --filter @sitecheck/api e2e:serve',
-      url: `${apiUrl}/health`,
-      reuseExistingServer: false,
-      env: {
-        NODE_ENV: 'test',
-        HOST: '127.0.0.1',
-        PORT: String(API_PORT),
-        DATABASE_URL: databaseUrl,
-        JWT_SECRET: 'e2e-only-secret-that-signs-nothing-real',
-        SEED_PASSWORD: E2E_PASSWORD,
-        DEMO_PASSWORD: E2E_DEMO_PASSWORD,
-      },
-    },
-    {
-      // The production build, not the dev server: what users would really get.
-      command: `pnpm --filter @sitecheck/web exec vite preview --port ${String(WEB_PORT)} --strictPort`,
-      url: webUrl,
-      reuseExistingServer: false,
-      env: { API_PROXY_TARGET: apiUrl },
-    },
-  ],
+  webServer: [apiServer, webServer],
 });
